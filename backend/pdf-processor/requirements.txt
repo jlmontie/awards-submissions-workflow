@@ -1,0 +1,8 @@
+functions-framework==3.5.0
+google-cloud-storage==2.14.0
+google-cloud-secret-manager==2.18.0
+google-api-python-client==2.114.0
+google-auth==2.26.2
+google-auth-httplib2==0.2.0
+PyPDF2==3.0.1
+

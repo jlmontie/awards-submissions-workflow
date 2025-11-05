@@ -1,0 +1,41 @@
+import { NextResponse } from 'next/server';
+import { Storage } from '@google-cloud/storage';
+
+const storage = new Storage();
+const publicAssetsBucket = process.env.PUBLIC_ASSETS_BUCKET!;
+const BLANK_FORM_PATH = 'blank-submission-form.pdf';
+
+export async function GET() {
+  try {
+    const bucket = storage.bucket(publicAssetsBucket);
+    const file = bucket.file(BLANK_FORM_PATH);
+
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      return NextResponse.json(
+        { error: 'Blank form not found' },
+        { status: 404 }
+      );
+    }
+
+    // Get file contents
+    const [fileContents] = await file.download();
+
+    // Return file with proper headers
+    return new NextResponse(fileContents, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="awards-submission-form.pdf"',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+  } catch (error: any) {
+    console.error('Error downloading form:', error);
+    return NextResponse.json(
+      { error: 'Failed to download form' },
+      { status: 500 }
+    );
+  }
+}
+

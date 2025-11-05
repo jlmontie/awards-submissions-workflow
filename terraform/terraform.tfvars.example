@@ -1,0 +1,30 @@
+# Google Cloud Project Configuration
+project_id = "your-gcp-project-id"
+region     = "us-central1"
+
+# Google Drive & Sheets Configuration
+drive_root_folder_id = "your-google-drive-folder-id"  # Get from Drive URL
+master_sheet_id      = "your-google-sheet-id"         # Get from Sheets URL
+
+# Domain Configuration (optional - for custom domain)
+domain = "awards.yourcompany.com"  # Leave empty to use default Cloud Run URL
+
+# reCAPTCHA Configuration
+recaptcha_site_key   = "your-recaptcha-v3-site-key"
+recaptcha_secret_key = "your-recaptcha-v3-secret-key"
+
+# Notification Email (for errors/alerts)
+admin_email = "admin@yourcompany.com"
+
+# Resource Configuration
+environment = "production"  # or "staging", "dev"
+
+# Storage Configuration
+storage_location      = "US"  # or "EU", "ASIA"
+storage_class         = "STANDARD"
+lifecycle_delete_days = 365  # Delete old submissions after 1 year
+
+# Limits
+max_pdf_size_mb   = 50
+max_photo_size_mb = 20
+
