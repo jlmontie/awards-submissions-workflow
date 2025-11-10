@@ -14,8 +14,8 @@ resource "google_cloud_run_v2_service" "frontend" {
     }
 
     containers {
-      # Image will be built and deployed via gcloud or CI/CD
-      # Initial placeholder image
+      # Start with placeholder image - Cloud Build will update it
+      # This prevents "image not found" errors on first deploy
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       ports {
@@ -65,8 +65,18 @@ resource "google_cloud_run_v2_service" "frontend" {
   }
 
   depends_on = [
-    google_project_service.required_apis
+    google_project_service.required_apis,
+    google_artifact_registry_repository.docker_repo
   ]
+
+  # Allow Cloud Build to update the image without Terraform interference
+  lifecycle {
+    ignore_changes = [
+      template[0].containers[0].image,
+      template[0].revision,
+      template[0].annotations,
+    ]
+  }
 }
 
 # Allow public access to Cloud Run

@@ -19,11 +19,12 @@ export async function GET() {
       );
     }
 
-    // Get file contents
+    // Get file contents as Buffer
     const [fileContents] = await file.download();
 
     // Return file with proper headers
-    return new NextResponse(fileContents, {
+    // Convert Buffer to Uint8Array for NextResponse
+    return new NextResponse(Uint8Array.from(fileContents), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': 'attachment; filename="awards-submission-form.pdf"',

@@ -3,13 +3,62 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
+  --foreground-rgb: 102, 102, 102;
   --background-rgb: 255, 255, 255;
+  --font-roboto: 'Roboto', ui-sans-serif, system-ui;
+  --font-montserrat: 'Montserrat', ui-sans-serif, system-ui;
+  --font-arial: Arial, Helvetica, sans-serif;
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+@layer base {
+  body {
+    color: rgb(var(--foreground-rgb));
+    background: rgb(var(--background-rgb));
+    font-family: var(--font-roboto);
+    font-weight: 300;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  h1 {
+    font-family: var(--font-montserrat);
+    font-weight: 700;
+    font-size: 60px;
+    line-height: 1.2;
+    color: rgba(0, 0, 0, 1);
+  }
+
+  h2 {
+    font-family: var(--font-montserrat);
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1.2;
+    color: rgba(0, 0, 0, 1);
+  }
+
+  h3 {
+    font-family: var(--font-arial);
+    font-weight: 400;
+    font-size: 24px;
+    line-height: 1.2;
+    color: rgba(0, 0, 0, 1);
+  }
+
+  h4, h5, h6 {
+    font-family: var(--font-arial);
+    font-weight: 700;
+    line-height: 1.2;
+    color: rgba(0, 0, 0, 1);
+  }
+
+  a {
+    color: #463939;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
 }
 
 @layer utilities {

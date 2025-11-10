@@ -1,11 +1,21 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Roboto, Montserrat } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const roboto = Roboto({
+  weight: ['300', '400', '500', '700'],
+  subsets: ['latin'],
+  variable: '--font-roboto',
+});
+
+const montserrat = Montserrat({
+  weight: ['400', '700'],
+  subsets: ['latin'],
+  variable: '--font-montserrat',
+});
 
 export const metadata: Metadata = {
-  title: 'Construction Awards Submission',
+  title: 'Most Outstanding Projects Competition',
   description: 'Submit your construction project for awards consideration',
 };
 
@@ -23,7 +33,7 @@ export default function RootLayout({
           defer
         />
       </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${roboto.variable} ${montserrat.variable} font-sans`}>{children}</body>
     </html>
   );
 }

@@ -67,22 +67,23 @@ output "next_steps" {
     ╚════════════════════════════════════════════════════════════════╝
     
     📋 Next Steps:
-    
-    1. Share Google Drive/Sheets with service account:
+
+    1. ✅ Frontend deployed automatically by Terraform!
+
+    2. Share Google Drive/Sheets with service account:
        ${google_service_account.backend.email}
-       
-    2. Upload blank PDF form:
+
+    3. Upload blank PDF form:
        gsutil cp example-filled-submission-form.pdf gs://${google_storage_bucket.public_assets.name}/blank-submission-form.pdf
-       
-    3. Build and deploy frontend:
-       cd ../frontend
-       gcloud run deploy ${google_cloud_run_v2_service.frontend.name} --source . --region ${var.region}
-       
+
     4. Access your application:
        ${google_cloud_run_v2_service.frontend.uri}
-       
+
     5. Monitor system:
        ${google_monitoring_dashboard.main.id}
+
+    📝 To redeploy frontend after code changes:
+       Just run 'terraform apply' again!
     
     📚 Documentation: See docs/ folder for detailed guides
     

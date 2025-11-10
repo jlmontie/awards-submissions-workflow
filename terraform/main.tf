@@ -16,11 +16,11 @@ terraform {
     }
   }
 
-  # Uncomment to use GCS backend for state
-  # backend "gcs" {
-  #   bucket = "your-terraform-state-bucket"
-  #   prefix = "awards-workflow"
-  # }
+  # Remote state stored in GCS for durability and team collaboration
+  backend "gcs" {
+    bucket = "utah-construction-design-terraform-state"
+    prefix = "awards-workflow"
+  }
 }
 
 provider "google" {

@@ -8,27 +8,36 @@ export default function Home() {
   const [submissionStarted, setSubmissionStarted] = useState(false);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+    <main className="min-h-screen bg-white">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Construction Awards Submission
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Submit your project for awards consideration
-          </p>
+      <header className="bg-navy-500 shadow-md">
+        <div className="max-w-7xl mx-auto px-8 lg:px-12 py-8">
+          <div className="flex flex-col items-center mb-6">
+            <img
+              src="/ucd-logo.png"
+              alt="Utah Construction & Design Magazine"
+              className="h-20 w-auto mb-4"
+            />
+          </div>
+          <div className="text-center">
+            <h1 className="text-4xl lg:text-5xl font-heading font-bold text-white">
+              Most Outstanding Projects Competition
+            </h1>
+            <p className="mt-3 text-white text-lg font-light">
+              Submit your project for awards consideration
+            </p>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-8 lg:px-12 py-16">
         {/* Instructions */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+        <div className="bg-gray-50 border-l-4 border-secondary-400 p-8 mb-12">
+          <h2 className="text-4xl font-heading font-bold text-black mb-6">
             Submission Instructions
           </h2>
-          <ol className="list-decimal list-inside space-y-2 text-gray-700">
+          <ol className="list-decimal list-inside space-y-3 text-base font-light" style={{ color: '#666' }}>
             <li>
               Download the blank submission form below and fill it out completely
             </li>
@@ -42,17 +51,17 @@ export default function Home() {
         </div>
 
         {/* Download Form Button */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white border border-gray-200 p-8 mb-12">
+          <h3 className="text-2xl font-subheading font-normal text-black mb-6">
             Step 1: Download Blank Form
           </h3>
           <a
             href="/api/download-form"
             download="awards-submission-form.pdf"
-            className="inline-flex items-center px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
+            className="inline-flex items-center px-8 py-4 bg-primary-500 text-black font-bold hover:bg-black hover:text-white transition-all duration-300"
           >
             <svg
-              className="w-5 h-5 mr-2"
+              className="w-5 h-5 mr-3"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -69,18 +78,18 @@ export default function Home() {
         </div>
 
         {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="bg-white border border-gray-200 p-8">
+          <h3 className="text-2xl font-subheading font-normal text-black mb-6">
             Step 2: Upload Your Submission
           </h3>
-          
+
           {!submissionStarted ? (
             <button
               onClick={() => setSubmissionStarted(true)}
-              className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
+              className="inline-flex items-center px-8 py-4 bg-primary-500 text-black font-bold hover:bg-black hover:text-white transition-all duration-300"
             >
               <svg
-                className="w-5 h-5 mr-2"
+                className="w-5 h-5 mr-3"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -100,12 +109,12 @@ export default function Home() {
         </div>
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-gray-600 text-sm">
-          <p>
+        <footer className="mt-16 pt-8 border-t-2 border-secondary-400 text-center">
+          <p className="text-base font-light" style={{ color: '#666' }}>
             Need help? Contact us at{' '}
             <a
               href="mailto:awards@example.com"
-              className="text-primary-600 hover:text-primary-700"
+              className="text-charcoal-500 font-normal hover:text-secondary-400 transition-colors"
             >
               awards@example.com
             </a>
