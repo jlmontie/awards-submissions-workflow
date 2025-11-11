@@ -16,6 +16,11 @@ recaptcha_secret_key = "your-recaptcha-v3-secret-key"
 # Notification Email (for errors/alerts)
 admin_email = "admin@yourcompany.com"
 
+# Drive Owner Email (for folder ownership transfer)
+# IMPORTANT: This must be the Google account that owns the Drive folder
+# This email will own all created folders and uploaded files
+drive_owner_email = "admin@yourcompany.com"
+
 # Resource Configuration
 environment = "production"  # or "staging", "dev"
 

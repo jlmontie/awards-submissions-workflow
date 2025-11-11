@@ -18,7 +18,7 @@ resource "null_resource" "build_frontend" {
         --config=${path.module}/../frontend/cloudbuild.yaml \
         --project=${var.project_id} \
         --region=${var.region} \
-        --substitutions=_REGION=${var.region},_SERVICE_NAME=${google_cloud_run_v2_service.frontend.name},_ARTIFACT_REGISTRY_REPO=${google_artifact_registry_repository.docker_repo.repository_id} \
+        --substitutions=_REGION=${var.region},_SERVICE_NAME=${google_cloud_run_v2_service.frontend.name},_ARTIFACT_REGISTRY_REPO=${google_artifact_registry_repository.docker_repo.repository_id},_RECAPTCHA_SITE_KEY=${var.recaptcha_site_key},_GCS_BUCKET=${google_storage_bucket.submissions.name},_PUBLIC_ASSETS_BUCKET=${google_storage_bucket.public_assets.name} \
         ${path.module}/../frontend
     EOT
   }

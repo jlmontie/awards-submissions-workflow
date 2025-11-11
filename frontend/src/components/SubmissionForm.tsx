@@ -42,7 +42,6 @@ export default function SubmissionForm() {
       const submissionId = uuidv4();
       const now = new Date();
       const year = now.getFullYear().toString();
-      const month = (now.getMonth() + 1).toString().padStart(2, '0');
 
       setSubmissionStatus({
         status: 'uploading',
@@ -50,7 +49,7 @@ export default function SubmissionForm() {
       });
 
       // Upload PDF
-      await uploadFile(pdfFile, submissionId, year, month, 'pdf', recaptchaToken);
+      await uploadFile(pdfFile, submissionId, year, 'pdf', recaptchaToken);
 
       setSubmissionStatus({
         status: 'uploading',
@@ -58,7 +57,7 @@ export default function SubmissionForm() {
       });
 
       // Upload photos in parallel (with concurrency limit)
-      await uploadPhotosInBatches(photoFiles, submissionId, year, month, recaptchaToken);
+      await uploadPhotosInBatches(photoFiles, submissionId, year, recaptchaToken);
 
       // Finalize submission
       setSubmissionStatus({
@@ -85,6 +84,8 @@ export default function SubmissionForm() {
   };
 
   const executeRecaptcha = async (): Promise<string> => {
+    const { config } = await import('@/config/env');
+
     return new Promise((resolve, reject) => {
       if (typeof window === 'undefined' || !window.grecaptcha) {
         reject(new Error('reCAPTCHA not loaded'));
@@ -93,7 +94,7 @@ export default function SubmissionForm() {
 
       window.grecaptcha.ready(() => {
         window.grecaptcha
-          .execute(process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY!, {
+          .execute(config.recaptchaSiteKey, {
             action: 'submit',
           })
           .then(resolve)
@@ -106,7 +107,6 @@ export default function SubmissionForm() {
     file: File,
     submissionId: string,
     year: string,
-    month: string,
     type: 'pdf' | 'photos',
     recaptchaToken: string
   ) => {
@@ -119,7 +119,6 @@ export default function SubmissionForm() {
         contentType: file.type,
         submissionId,
         year,
-        month,
         type,
         recaptchaToken,
       }),
@@ -149,7 +148,6 @@ export default function SubmissionForm() {
     photos: File[],
     submissionId: string,
     year: string,
-    month: string,
     recaptchaToken: string
   ) => {
     const BATCH_SIZE = 3; // Upload 3 photos at a time
@@ -164,7 +162,7 @@ export default function SubmissionForm() {
 
       await Promise.all(
         batch.map(photo =>
-          uploadFile(photo, submissionId, year, month, 'photos', recaptchaToken)
+          uploadFile(photo, submissionId, year, 'photos', recaptchaToken)
         )
       );
     }

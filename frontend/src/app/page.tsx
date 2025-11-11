@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import FileUpload from '@/components/FileUpload';
 import SubmissionForm from '@/components/SubmissionForm';
+import RecaptchaLoader from '@/components/RecaptchaLoader';
 
 export default function Home() {
   const [submissionStarted, setSubmissionStarted] = useState(false);
 
   return (
     <main className="min-h-screen bg-white">
+      <RecaptchaLoader />
       {/* Header */}
       <header className="bg-navy-500 shadow-md">
         <div className="max-w-7xl mx-auto px-8 lg:px-12 py-8">

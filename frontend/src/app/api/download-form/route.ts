@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { Storage } from '@google-cloud/storage';
 
+// Force this route to be dynamic (not pre-rendered at build time)
+export const dynamic = 'force-dynamic';
+
 const storage = new Storage();
 const publicAssetsBucket = process.env.PUBLIC_ASSETS_BUCKET!;
 const BLANK_FORM_PATH = 'blank-submission-form.pdf';

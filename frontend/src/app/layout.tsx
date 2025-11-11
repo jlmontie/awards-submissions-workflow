@@ -26,13 +26,6 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <head>
-        <script
-          src={`https://www.google.com/recaptcha/api.js?render=${process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY}`}
-          async
-          defer
-        />
-      </head>
       <body className={`${roboto.variable} ${montserrat.variable} font-sans`}>{children}</body>
     </html>
   );

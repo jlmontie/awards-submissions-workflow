@@ -55,6 +55,7 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
       SHEET_ID_SECRET      = google_secret_manager_secret.sheet_id.secret_id
       SUBMISSIONS_BUCKET   = google_storage_bucket.submissions.name
       MAX_PDF_SIZE_MB      = var.max_pdf_size_mb
+      DRIVE_OWNER_EMAIL    = var.drive_owner_email
     }
   }
 
@@ -74,6 +75,15 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   depends_on = [
     google_project_service.required_apis
   ]
+}
+
+# Allow Eventarc to invoke the PDF processor function
+resource "google_cloud_run_service_iam_member" "pdf_processor_invoker" {
+  project  = google_cloudfunctions2_function.pdf_processor.project
+  location = google_cloudfunctions2_function.pdf_processor.location
+  service  = google_cloudfunctions2_function.pdf_processor.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
 # Cloud Function for photo processing
@@ -106,6 +116,7 @@ resource "google_cloudfunctions2_function" "photo_processor" {
       DRIVE_FOLDER_SECRET = google_secret_manager_secret.drive_folder.secret_id
       SUBMISSIONS_BUCKET  = google_storage_bucket.submissions.name
       MAX_PHOTO_SIZE_MB   = var.max_photo_size_mb
+      DRIVE_OWNER_EMAIL   = var.drive_owner_email
     }
   }
 
@@ -125,6 +136,15 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   depends_on = [
     google_project_service.required_apis
   ]
+}
+
+# Allow Eventarc to invoke the photo processor function
+resource "google_cloud_run_service_iam_member" "photo_processor_invoker" {
+  project  = google_cloudfunctions2_function.photo_processor.project
+  location = google_cloudfunctions2_function.photo_processor.location
+  service  = google_cloudfunctions2_function.photo_processor.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
 }
 
 # Outputs

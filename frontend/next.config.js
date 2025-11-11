@@ -2,12 +2,6 @@
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
-  
-  // Environment variables exposed to browser
-  env: {
-    NEXT_PUBLIC_GCS_BUCKET: process.env.NEXT_PUBLIC_GCS_BUCKET,
-    NEXT_PUBLIC_RECAPTCHA_SITE_KEY: process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY,
-  },
 
   // Security headers
   async headers() {

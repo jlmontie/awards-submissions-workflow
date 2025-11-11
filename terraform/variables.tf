@@ -77,3 +77,8 @@ variable "max_photo_size_mb" {
   default     = 20
 }
 
+variable "drive_owner_email" {
+  description = "Email of the Google Drive folder owner (for transferring folder ownership)"
+  type        = string
+}
+

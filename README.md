@@ -2,6 +2,9 @@
 
 A production-grade, scalable system for handling construction awards submissions with automated PDF processing and unlimited photo uploads.
 
+> **🚨 DEPLOYING FOR THE FIRST TIME?**
+> Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and **DO NOT SKIP** the [OAuth Authentication Setup](docs/AUTHENTICATION_SETUP.md) - it's required for the system to work!
+
 ## Overview
 
 This system provides a complete serverless workflow for accepting award submissions through a web interface, automatically extracting PDF form data, organizing files in Google Drive, and maintaining a master spreadsheet. Built entirely on Google Cloud Platform with infrastructure-as-code.
@@ -38,7 +41,7 @@ This system provides a complete serverless workflow for accepting award submissi
 2. After filling it out, they upload the PDF and project photos
 3. Files are uploaded directly to Google Cloud Storage (secure, signed URLs)
 4. Cloud Functions automatically trigger on file uploads
-5. PDF data is extracted and a Drive folder is created (`Awards/YYYY/YYYY-MM/ProjectName/`)
+5. PDF data is extracted and a Drive folder is created (`Awards/YYYY/ProjectName/`)
 6. All files are uploaded to the Drive folder and a row is added to the master spreadsheet
 7. No manual processing required!
 
@@ -84,9 +87,10 @@ This system provides a complete serverless workflow for accepting award submissi
 │   └── setup-google-apis.sh # Enable required APIs
 │
 └── docs/                    # Documentation
-    ├── DEPLOYMENT.md        # Deployment guide
-    ├── CONFIGURATION.md     # Configuration guide
-    └── DEVELOPMENT.md       # Development setup
+    ├── DEPLOYMENT.md        # Complete deployment guide
+    ├── AUTHENTICATION_SETUP.md  # ⚠️ CRITICAL: OAuth setup
+    ├── CONFIGURATION.md     # Configuration options
+    └── DEVELOPMENT.md       # Local development setup
 ```
 
 ## 🚀 Quick Start
@@ -95,15 +99,15 @@ This system provides a complete serverless workflow for accepting award submissi
 
 ### For First-Time Setup (Production Deployment)
 
-**Time:** ~45 minutes | **Guide:** [QUICKSTART.md](QUICKSTART.md)
+**Time:** ~45 minutes | **Primary Guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 1. Create Google Drive folder and Sheet
 2. Set up reCAPTCHA v3
-3. Configure and deploy with Terraform
-4. Share resources with service account
-5. Deploy frontend to Cloud Run
+3. **⚠️ CRITICAL:** [Setup OAuth Authentication](docs/AUTHENTICATION_SETUP.md)
+4. Configure and deploy with Terraform
+5. Share Drive folder with your Google account
 
-The QUICKSTART guide walks you through every step with copy-paste commands.
+**Important:** The OAuth authentication step (Step 3) is **required** for the system to work. Don't skip it!
 
 ### For Development & Testing
 
@@ -138,11 +142,10 @@ Before starting any deployment:
 
 | Document | Purpose | When to Use |
 |----------|---------|-------------|
-| **[QUICKSTART.md](QUICKSTART.md)** | Fast deployment guide | First-time production setup |
-| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Detailed deployment steps | Step-by-step deployment walkthrough |
+| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Complete deployment guide | **START HERE** for production setup |
+| **⚠️ [docs/AUTHENTICATION_SETUP.md](docs/AUTHENTICATION_SETUP.md)** | **OAuth setup (REQUIRED)** | **MUST DO** before `terraform apply` |
 | **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | All configuration options | Customizing the system |
 | **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Local development setup | Testing and development |
-| **[backend/pdf-processor/README_LOCAL_DEV.md](backend/pdf-processor/README_LOCAL_DEV.md)** | Local PDF testing | Testing PDF field extraction |
 
 ## Technology Stack
 

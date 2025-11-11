@@ -14,9 +14,24 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Build arguments for Next.js public env vars
+# These are embedded into the client bundle at build time
+ARG NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+ARG NEXT_PUBLIC_GCS_BUCKET
+ARG GCP_PROJECT_ID
+ARG PUBLIC_ASSETS_BUCKET
+
+# Set as environment variables for the build
+ENV NEXT_PUBLIC_RECAPTCHA_SITE_KEY=$NEXT_PUBLIC_RECAPTCHA_SITE_KEY
+ENV NEXT_PUBLIC_GCS_BUCKET=$NEXT_PUBLIC_GCS_BUCKET
+ENV GCP_PROJECT_ID=$GCP_PROJECT_ID
+ENV PUBLIC_ASSETS_BUCKET=$PUBLIC_ASSETS_BUCKET
+
 # Build Next.js application
 ENV NEXT_TELEMETRY_DISABLED 1
+RUN node test-env.js || echo "test-env.js not found"
 RUN npm run build
+RUN echo "Checking built config..." && cat .next/server/app/config/env.js || echo "Config not found"
 
 # Production image, copy all the files and run next
 FROM base AS runner

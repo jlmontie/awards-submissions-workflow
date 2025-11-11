@@ -88,16 +88,36 @@ gcloud services enable \
 3. Add your domain(s)
 4. Save the Site Key and Secret Key
 
-## Step 3: Configure Terraform
+## Step 3: Setup User OAuth Authentication
 
-### 3.1 Copy Example Variables
+**⚠️ CRITICAL STEP - DO NOT SKIP**
+
+The Cloud Functions need to access Google Drive and Sheets **as you** (using your storage quota). This requires setting up OAuth credentials.
+
+**👉 Follow the complete guide:** [AUTHENTICATION_SETUP.md](AUTHENTICATION_SETUP.md)
+
+Quick summary:
+```bash
+# 1. Generate OAuth credentials
+gcloud auth application-default login
+
+# 2. Store in Secret Manager
+cat ~/.config/gcloud/application_default_credentials.json | \
+  gcloud secrets create awards-production-user-oauth-token \
+    --data-file=- \
+    --project=YOUR_PROJECT_ID
+```
+
+## Step 4: Configure Terraform
+
+### 4.1 Copy Example Variables
 
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-### 3.2 Edit Configuration
+### 4.2 Edit Configuration
 
 Edit `terraform.tfvars` with your values:
 
@@ -112,11 +132,12 @@ recaptcha_site_key   = "your-recaptcha-site-key"
 recaptcha_secret_key = "your-recaptcha-secret-key"
 
 admin_email = "your-email@example.com"
+drive_owner_email = "your-email@example.com"  # MUST match OAuth account
 
 environment = "production"
 ```
 
-## Step 4: Deploy Infrastructure with Terraform
+## Step 5: Deploy Infrastructure with Terraform
 
 ### 4.1 Initialize Terraform
 

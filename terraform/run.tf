@@ -41,6 +41,11 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name  = "RECAPTCHA_SECRET_KEY"
+        value = var.recaptcha_secret_key
+      }
+
+      env {
         name  = "GCP_PROJECT_ID"
         value = var.project_id
       }

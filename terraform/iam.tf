@@ -50,6 +50,13 @@ resource "google_storage_bucket_iam_member" "frontend_public_assets" {
   member = "serviceAccount:${google_service_account.frontend.email}"
 }
 
+# Grant frontend permission to sign URLs (for generating signed upload URLs)
+resource "google_service_account_iam_member" "frontend_token_creator" {
+  service_account_id = google_service_account.frontend.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:${google_service_account.frontend.email}"
+}
+
 # Allow Cloud Functions to be invoked by Eventarc
 resource "google_project_iam_member" "eventarc_invoker" {
   project = var.project_id
