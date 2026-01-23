@@ -56,6 +56,11 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name  = "SHEET_ID"
+        value = var.master_sheet_id
+      }
+
+      env {
         name  = "NODE_ENV"
         value = "production"
       }
