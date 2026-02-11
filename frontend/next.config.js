@@ -2,6 +2,9 @@
 const nextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  
+  // Increase static page generation timeout for API routes during build
+  staticPageGenerationTimeout: 120, // seconds
 
   // Security headers
   async headers() {

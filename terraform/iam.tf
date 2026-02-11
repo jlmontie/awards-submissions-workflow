@@ -33,8 +33,12 @@ resource "google_project_iam_member" "backend_secrets" {
 resource "google_service_account" "frontend" {
   account_id   = "${local.name_prefix}-frontend"
   display_name = "Awards Frontend Service Account"
-  description  = "Service account for Cloud Run frontend"
+  description  = "Service account for Cloud Run frontend (includes admin portal API routes)"
 }
+
+# NOTE: The frontend also needs access to Google Sheets for the admin portal.
+# Share your Google Sheet with this service account email (as Viewer or Editor):
+#   ${local.name_prefix}-frontend@${var.project_id}.iam.gserviceaccount.com
 
 # Grant frontend ability to sign URLs for GCS uploads
 resource "google_storage_bucket_iam_member" "frontend_submissions" {

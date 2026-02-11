@@ -3,6 +3,7 @@ import { Storage } from '@google-cloud/storage';
 
 // Force this route to be dynamic (not pre-rendered at build time)
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const storage = new Storage();
 const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET!;

@@ -1,0 +1,14 @@
+# Development requirements for running admin scripts locally
+# Install with: pip install -r requirements-dev.txt
+
+# Google Cloud dependencies
+google-cloud-secret-manager>=2.18.0
+google-api-python-client>=2.114.0
+google-auth>=2.26.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+
+# For testing/development
+python-dotenv>=1.0.0
+
+

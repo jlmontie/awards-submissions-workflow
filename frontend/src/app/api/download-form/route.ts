@@ -3,12 +3,18 @@ import { Storage } from '@google-cloud/storage';
 
 // Force this route to be dynamic (not pre-rendered at build time)
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 const storage = new Storage();
 const publicAssetsBucket = process.env.PUBLIC_ASSETS_BUCKET!;
 const BLANK_FORM_PATH = 'blank-submission-form.pdf';
 
 export async function GET() {
+  // Skip execution during build time (CI=true is set by Cloud Build)
+  if (process.env.CI === 'true' && !process.env.RUNTIME_ENV) {
+    return NextResponse.json({ error: 'Build time - route not available' }, { status: 503 });
+  }
+
   try {
     const bucket = storage.bucket(publicAssetsBucket);
     const file = bucket.file(BLANK_FORM_PATH);

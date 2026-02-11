@@ -3,7 +3,35 @@
 A production-grade, scalable system for handling construction awards submissions with automated PDF processing and unlimited photo uploads.
 
 > **🚨 DEPLOYING FOR THE FIRST TIME?**
-> Follow [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) and **DO NOT SKIP** the [OAuth Authentication Setup](docs/AUTHENTICATION_SETUP.md) - it's required for the system to work!
+> Follow [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) and **DO NOT SKIP** the [OAuth Authentication Setup](docs/deployment/AUTHENTICATION_SETUP.md) - it's required for the system to work!
+
+---
+
+## 📢 NEW: Unified Platform Development - Phase 1 Complete! ✅
+
+**Looking to expand beyond awards?** We've analyzed the complete UC&D automation needs, and we're now building the unified platform!
+
+### 🎉 Phase 1: Awards ID System Enhancement - COMPLETE
+✅ Unique submission IDs (AW-YYYY-NNN format)  
+✅ Winner tracking in Google Sheets  
+✅ Confirmation email templates  
+✅ Admin CLI tools for winner management  
+✅ Project team extraction and export  
+
+**See:** [docs/roadmap/PHASE1_COMPLETE.md](docs/roadmap/PHASE1_COMPLETE.md) | [docs/roadmap/PHASE1_TESTING_GUIDE.md](docs/roadmap/PHASE1_TESTING_GUIDE.md)
+
+### 📋 Implementation Plan & Documentation:
+- **⭐ [docs/roadmap/ONE_PAGE_SUMMARY.md](docs/roadmap/ONE_PAGE_SUMMARY.md)** - Print-friendly overview (5 min read)
+- **🎯 [docs/roadmap/QUICK_DECISION_GUIDE.md](docs/roadmap/QUICK_DECISION_GUIDE.md)** - Choose your path (10 min read)
+- **🚀 [docs/roadmap/IMPLEMENTATION_PLAN.md](docs/roadmap/IMPLEMENTATION_PLAN.md)** - **Executable 12-week plan** (Phase 1 done!)
+- **📊 [docs/roadmap/PROJECT_OVERVIEW.md](docs/roadmap/PROJECT_OVERVIEW.md)** - Complete navigation guide
+- **📖 [docs/roadmap/PROJECT_SCOPE_ANALYSIS.md](docs/roadmap/PROJECT_SCOPE_ANALYSIS.md)** - Detailed analysis (25 min read)
+- **🏗️ [docs/roadmap/ARCHITECTURE_VISION.md](docs/roadmap/ARCHITECTURE_VISION.md)** - Technical architecture (20 min read)
+- **💾 [docs/roadmap/DATA_ARCHITECTURE_ANALYSIS.md](docs/roadmap/DATA_ARCHITECTURE_ANALYSIS.md)** - Data storage strategy
+
+**Next:** Phase 2 - Portal Foundation (January 2026) - Admin web dashboard with authentication
+
+---
 
 ## Overview
 
@@ -86,7 +114,7 @@ This system provides a complete serverless workflow for accepting award submissi
 ├── scripts/                 # Helper scripts
 │   └── setup-google-apis.sh # Enable required APIs
 │
-└── docs/                    # Documentation
+└── docs/deployment/         # Documentation
     ├── DEPLOYMENT.md        # Complete deployment guide
     ├── AUTHENTICATION_SETUP.md  # ⚠️ CRITICAL: OAuth setup
     ├── CONFIGURATION.md     # Configuration options
@@ -99,11 +127,11 @@ This system provides a complete serverless workflow for accepting award submissi
 
 ### For First-Time Setup (Production Deployment)
 
-**Time:** ~45 minutes | **Primary Guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+**Time:** ~45 minutes | **Primary Guide:** [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md)
 
 1. Create Google Drive folder and Sheet
 2. Set up reCAPTCHA v3
-3. **⚠️ CRITICAL:** [Setup OAuth Authentication](docs/AUTHENTICATION_SETUP.md)
+3. **⚠️ CRITICAL:** [Setup OAuth Authentication](docs/deployment/AUTHENTICATION_SETUP.md)
 4. Configure and deploy with Terraform
 5. Share Drive folder with your Google account
 
@@ -111,7 +139,7 @@ This system provides a complete serverless workflow for accepting award submissi
 
 ### For Development & Testing
 
-**Guide:** [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+**Guide:** [docs/deployment/DEVELOPMENT.md](docs/deployment/DEVELOPMENT.md)
 
 - Run the Next.js frontend locally
 - Test Cloud Functions on your machine
@@ -120,7 +148,7 @@ This system provides a complete serverless workflow for accepting award submissi
 
 ### For Configuration & Customization
 
-**Guide:** [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+**Guide:** [docs/deployment/CONFIGURATION.md](docs/deployment/CONFIGURATION.md)
 
 - Customize file size limits
 - Map PDF form fields to your forms
@@ -142,10 +170,10 @@ Before starting any deployment:
 
 | Document | Purpose | When to Use |
 |----------|---------|-------------|
-| **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** | Complete deployment guide | **START HERE** for production setup |
-| **⚠️ [docs/AUTHENTICATION_SETUP.md](docs/AUTHENTICATION_SETUP.md)** | **OAuth setup (REQUIRED)** | **MUST DO** before `terraform apply` |
-| **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** | All configuration options | Customizing the system |
-| **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** | Local development setup | Testing and development |
+| **[docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md)** | Complete deployment guide | **START HERE** for production setup |
+| **⚠️ [docs/deployment/AUTHENTICATION_SETUP.md](docs/deployment/AUTHENTICATION_SETUP.md)** | **OAuth setup (REQUIRED)** | **MUST DO** before `terraform apply` |
+| **[docs/deployment/CONFIGURATION.md](docs/deployment/CONFIGURATION.md)** | All configuration options | Customizing the system |
+| **[docs/deployment/DEVELOPMENT.md](docs/deployment/DEVELOPMENT.md)** | Local development setup | Testing and development |
 
 ## Technology Stack
 
@@ -190,7 +218,7 @@ Scale automatically with usage. Set up budget alerts to monitor costs.
 
 Having issues? Check these resources:
 
-1. **Common Issues:** See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#troubleshooting)
+1. **Common Issues:** See [docs/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md#troubleshooting)
 2. **Logs:** `gcloud logging read "resource.type=cloud_function" --limit=50`
 3. **Service Status:** `gcloud run services list && gcloud functions list`
 

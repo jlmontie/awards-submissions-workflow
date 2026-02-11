@@ -43,11 +43,13 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   }
 
   service_config {
-    max_instance_count    = 10
-    min_instance_count    = 0
-    available_memory      = "512M"
-    timeout_seconds       = 540
-    service_account_email = google_service_account.backend.email
+    max_instance_count               = 10
+    min_instance_count               = 0
+    available_memory                 = "512M"
+    timeout_seconds                  = 540
+    service_account_email            = google_service_account.backend.email
+    ingress_settings                 = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision   = true
 
     environment_variables = {
       GCP_PROJECT_ID       = var.project_id
@@ -62,7 +64,8 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   event_trigger {
     trigger_region        = var.region
     event_type            = "google.cloud.storage.object.v1.finalized"
-    retry_policy          = "RETRY_POLICY_RETRY"
+    retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"  # No automatic retries - fail fast to save costs
+    service_account_email = google_service_account.backend.email
     
     event_filters {
       attribute = "bucket"
@@ -78,12 +81,13 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
 }
 
 # Allow Eventarc to invoke the PDF processor function
+# Use the backend service account since that's what's specified in event_trigger
 resource "google_cloud_run_service_iam_member" "pdf_processor_invoker" {
   project  = google_cloudfunctions2_function.pdf_processor.project
   location = google_cloudfunctions2_function.pdf_processor.location
   service  = google_cloudfunctions2_function.pdf_processor.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.backend.email}"
 }
 
 # Cloud Function for photo processing
@@ -105,11 +109,13 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   }
 
   service_config {
-    max_instance_count    = 20
-    min_instance_count    = 0
-    available_memory      = "256M"
-    timeout_seconds       = 120
-    service_account_email = google_service_account.backend.email
+    max_instance_count               = 20
+    min_instance_count               = 0
+    available_memory                 = "256M"
+    timeout_seconds                  = 120
+    service_account_email            = google_service_account.backend.email
+    ingress_settings                 = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision   = true
 
     environment_variables = {
       GCP_PROJECT_ID      = var.project_id
@@ -123,7 +129,8 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   event_trigger {
     trigger_region        = var.region
     event_type            = "google.cloud.storage.object.v1.finalized"
-    retry_policy          = "RETRY_POLICY_RETRY"
+    retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"  # No automatic retries - fail fast to save costs
+    service_account_email = google_service_account.backend.email
     
     event_filters {
       attribute = "bucket"
@@ -139,12 +146,13 @@ resource "google_cloudfunctions2_function" "photo_processor" {
 }
 
 # Allow Eventarc to invoke the photo processor function
+# Use the backend service account since that's what's specified in event_trigger
 resource "google_cloud_run_service_iam_member" "photo_processor_invoker" {
   project  = google_cloudfunctions2_function.photo_processor.project
   location = google_cloudfunctions2_function.photo_processor.location
   service  = google_cloudfunctions2_function.photo_processor.name
   role     = "roles/run.invoker"
-  member   = "serviceAccount:${data.google_project.project.number}-compute@developer.gserviceaccount.com"
+  member   = "serviceAccount:${google_service_account.backend.email}"
 }
 
 # Outputs

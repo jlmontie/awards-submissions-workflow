@@ -45,6 +45,7 @@ resource "google_project_service" "required_apis" {
     "secretmanager.googleapis.com",
     "cloudscheduler.googleapis.com",
     "eventarc.googleapis.com",
+    "pubsub.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "artifactregistry.googleapis.com",
