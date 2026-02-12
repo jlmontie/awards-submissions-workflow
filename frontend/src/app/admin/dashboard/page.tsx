@@ -7,7 +7,7 @@ async function getStats() {
   // Fetch stats from API
   try {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const res = await fetch(`${baseUrl}/api/admin/stats`, {
+    const res = await fetch(`${baseUrl}/api/awards/admin/stats`, {
       cache: 'no-store',
     });
     if (!res.ok) throw new Error('Failed to fetch stats');
@@ -142,7 +142,7 @@ export default async function DashboardPage() {
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Link
-            href="/admin/submissions"
+            href="/admin/awards"
             className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
           >
             <div className="flex-1 min-w-0">
@@ -156,7 +156,7 @@ export default async function DashboardPage() {
           </Link>
 
           <Link
-            href="/admin/submissions?filter=pending"
+            href="/admin/awards?filter=pending"
             className="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400"
           >
             <div className="flex-1 min-w-0">
@@ -173,5 +173,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-
-

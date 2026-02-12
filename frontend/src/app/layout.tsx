@@ -15,8 +15,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'Most Outstanding Projects Competition',
-  description: 'Submit your construction project for awards consideration',
+  title: 'UC&D Tools',
+  description: 'Utah Construction & Design business tools platform',
 };
 
 export default function RootLayout({
@@ -30,4 +30,3 @@ export default function RootLayout({
     </html>
   );
 }
-
