@@ -1,5 +1,7 @@
 /**
- * Seeds a test survey and recipient into the Google Sheet.
+ * Seeds a test survey, master contact list, and firm-level recipients
+ * into the Google Sheet.
+ *
  * Run from the frontend/ directory:
  *   node scripts/seed-test-survey.js
  */
@@ -30,7 +32,35 @@ async function main() {
 
   const sheets = google.sheets({ version: 'v4', auth });
 
-  // 1. Add a test survey
+  // 1. Seed the Survey Contacts tab (master contact list)
+  console.log('Seeding Survey Contacts tab...');
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: SPREADSHEET_ID,
+    range: 'Survey Contacts!A:E',
+    valueInputOption: 'USER_ENTERED',
+    requestBody: {
+      values: [
+        // Header row (only needed if tab is empty)
+        ['firm_name', 'contact_name', 'contact_email', 'category', 'active'],
+        // Firm with multiple contacts
+        ['Test Architecture Firm', 'Jesse Montgomery', 'jlmontie@gmail.com', 'architects', 'TRUE'],
+        ['Test Architecture Firm', 'Jane Smith', 'jane@testfirm.com', 'architects', 'TRUE'],
+        // Another firm with one contact
+        ['Acme Design Group', 'John Doe', 'john@acmedesign.com', 'architects', 'TRUE'],
+        // Firm with multiple contacts
+        ['Summit Architects', 'Alice Park', 'alice@summitarch.com', 'architects', 'TRUE'],
+        ['Summit Architects', 'Bob Chen', 'bob@summitarch.com', 'architects', 'TRUE'],
+        ['Summit Architects', 'Carol White', 'carol@summitarch.com', 'architects', 'TRUE'],
+        // Inactive contact (should be skipped during import)
+        ['Retired Firm LLC', 'Old Timer', 'old@retired.com', 'architects', 'FALSE'],
+        // GC category (should not be imported for architects survey)
+        ['BuildCo General', 'Mike Builder', 'mike@buildco.com', 'gc', 'TRUE'],
+      ],
+    },
+  });
+  console.log('  -> Survey Contacts seeded with test data');
+
+  // 2. Add a test survey
   console.log('Adding test survey...');
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
@@ -50,7 +80,8 @@ async function main() {
   });
   console.log('  -> Survey ARCH-2026 created');
 
-  // 2. Add a test recipient with a known token
+  // 3. Add a test recipient (firm-level, new column structure)
+  //    Columns: recipient_id | survey_id | firm_name | token | status | sent_at | reminded_at | completed_at | draft_data | draft_saved_at
   console.log('Adding test recipient...');
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
@@ -61,13 +92,13 @@ async function main() {
         'R-001',
         'ARCH-2026',
         'Test Architecture Firm',
-        'Jesse Montgomery',
-        'jlmontie@gmail.com',
         'test123',
         'pending',
-        '',
-        '',
-        '0',
+        '',  // sent_at
+        '',  // reminded_at
+        '',  // completed_at
+        '',  // draft_data
+        '',  // draft_saved_at
       ]],
     },
   });

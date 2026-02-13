@@ -16,7 +16,8 @@ interface SurveyInfo {
   };
   recipient: {
     firmName: string;
-    contactName: string;
+    draftData: Record<string, string | boolean> | null;
+    draftSavedAt: string | null;
   };
 }
 
@@ -109,9 +110,9 @@ export default function SurveyPage() {
           <p className="mt-1 text-sm text-gray-500 text-center">
             Due: {surveyInfo.survey.deadline}
           </p>
-          {surveyInfo.recipient.contactName && (
+          {surveyInfo.recipient.firmName && (
             <p className="mt-2 text-sm text-gray-600 text-center">
-              Welcome, {surveyInfo.recipient.contactName}
+              Survey for {surveyInfo.recipient.firmName}
             </p>
           )}
         </div>
@@ -126,6 +127,8 @@ export default function SurveyPage() {
           deadline={surveyInfo.survey.deadline}
           token={token}
           initialFirmName={surveyInfo.recipient.firmName}
+          initialDraftData={surveyInfo.recipient.draftData}
+          initialDraftSavedAt={surveyInfo.recipient.draftSavedAt}
           onSuccess={() => router.push(`/surveys/${token}/confirmation`)}
         />
       </div>

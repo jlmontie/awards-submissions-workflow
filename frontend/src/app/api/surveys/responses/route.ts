@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { getSheetsClient } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,13 +14,6 @@ export const runtime = 'nodejs';
  * Writes a row to the "Survey Responses" sheet and updates the
  * recipient status to "completed" in "Survey Recipients".
  */
-
-async function getSheetsClient() {
-  const auth = new google.auth.GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-  return google.sheets({ version: 'v4', auth });
-}
 
 export async function POST(request: NextRequest) {
   try {
