@@ -7,6 +7,8 @@ resource "google_secret_manager_secret" "recaptcha_secret" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_secret_manager_secret_version" "recaptcha_secret_version" {
@@ -23,6 +25,8 @@ resource "google_secret_manager_secret" "drive_folder" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_secret_manager_secret_version" "drive_folder_version" {
@@ -39,6 +43,8 @@ resource "google_secret_manager_secret" "sheet_id" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_secret_manager_secret_version" "sheet_id_version" {
@@ -56,6 +62,8 @@ resource "google_secret_manager_secret" "survey_sheet_id" {
   replication {
     auto {}
   }
+
+  depends_on = [google_project_service.required_apis]
 }
 
 resource "google_secret_manager_secret_version" "survey_sheet_id_version" {

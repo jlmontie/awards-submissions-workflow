@@ -18,7 +18,7 @@ terraform {
 
   # Remote state stored in GCS for durability and team collaboration
   backend "gcs" {
-    bucket = "utah-construction-design-terraform-state"
+    bucket = "uc-and-d-terraform-state"
     prefix = "awards-workflow"
   }
 }

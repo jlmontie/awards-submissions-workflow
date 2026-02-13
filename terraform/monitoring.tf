@@ -1,6 +1,8 @@
 # Log-based metric for PDF processing failures
 resource "google_logging_metric" "pdf_processing_errors" {
-  name   = "${local.name_prefix}-pdf-errors"
+  name = "${local.name_prefix}-pdf-errors"
+
+  depends_on = [google_project_service.required_apis]
   filter = <<-EOT
     resource.type="cloud_function"
     resource.labels.function_name="${google_cloudfunctions2_function.pdf_processor.name}"
@@ -60,10 +62,12 @@ resource "google_monitoring_alert_policy" "pdf_processing_errors" {
 resource "google_monitoring_notification_channel" "email" {
   display_name = "Admin Email"
   type         = "email"
-  
+
   labels = {
     email_address = var.admin_email
   }
+
+  depends_on = [google_project_service.required_apis]
 }
 
 # Dashboard for monitoring
