@@ -82,3 +82,9 @@ variable "drive_owner_email" {
   type        = string
 }
 
+variable "survey_sheet_id" {
+  description = "Google Sheets ID for survey data"
+  type        = string
+  default     = ""
+}
+

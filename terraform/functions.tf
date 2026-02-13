@@ -155,6 +155,75 @@ resource "google_cloud_run_service_iam_member" "photo_processor_invoker" {
   member   = "serviceAccount:${google_service_account.backend.email}"
 }
 
+# ── Survey Export (HTTP-triggered) ───────────────────────────────────
+# Only created when survey_sheet_id is configured
+
+data "archive_file" "survey_export_source" {
+  count       = var.survey_sheet_id != "" ? 1 : 0
+  type        = "zip"
+  source_dir  = "${path.module}/../backend/survey-export"
+  output_path = "${path.module}/.terraform/tmp/survey-export.zip"
+}
+
+resource "google_storage_bucket_object" "survey_export_zip" {
+  count  = var.survey_sheet_id != "" ? 1 : 0
+  name   = "survey-export-${data.archive_file.survey_export_source[0].output_md5}.zip"
+  bucket = google_storage_bucket.functions_source.name
+  source = data.archive_file.survey_export_source[0].output_path
+}
+
+resource "google_cloudfunctions2_function" "survey_export" {
+  count       = var.survey_sheet_id != "" ? 1 : 0
+  name        = "${local.name_prefix}-survey-export"
+  location    = var.region
+  description = "Exports survey responses as tab-delimited text for publication"
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "export_survey"
+
+    source {
+      storage_source {
+        bucket = google_storage_bucket.functions_source.name
+        object = google_storage_bucket_object.survey_export_zip[0].name
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count             = 1
+    min_instance_count             = 0
+    available_memory               = "256M"
+    timeout_seconds                = 60
+    service_account_email          = google_service_account.backend.email
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision = true
+
+    environment_variables = {
+      GCP_PROJECT_ID        = var.project_id
+      SURVEY_SHEET_ID       = var.survey_sheet_id
+    }
+  }
+
+  # No event_trigger block = HTTP-triggered function
+
+  labels = local.common_labels
+
+  depends_on = [
+    google_project_service.required_apis
+  ]
+}
+
+# Allow the backend service account to invoke the survey export function
+resource "google_cloud_run_service_iam_member" "survey_export_invoker" {
+  count    = var.survey_sheet_id != "" ? 1 : 0
+  project  = google_cloudfunctions2_function.survey_export[0].project
+  location = google_cloudfunctions2_function.survey_export[0].location
+  service  = google_cloudfunctions2_function.survey_export[0].name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.backend.email}"
+}
+
 # Outputs
 output "pdf_processor_function_url" {
   value       = google_cloudfunctions2_function.pdf_processor.service_config[0].uri
@@ -164,5 +233,10 @@ output "pdf_processor_function_url" {
 output "photo_processor_function_url" {
   value       = google_cloudfunctions2_function.photo_processor.service_config[0].uri
   description = "URL of the photo processor function"
+}
+
+output "survey_export_function_url" {
+  value       = var.survey_sheet_id != "" ? google_cloudfunctions2_function.survey_export[0].service_config[0].uri : ""
+  description = "URL of the survey export function"
 }
 
