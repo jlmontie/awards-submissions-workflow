@@ -49,6 +49,7 @@ resource "google_project_service" "required_apis" {
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "artifactregistry.googleapis.com",
+    "iamcredentials.googleapis.com",
   ])
 
   service                    = each.value
