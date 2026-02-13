@@ -13,7 +13,7 @@ export default function AdminLayout({
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <h1 className="text-xl font-bold text-gray-900">
-                UC&D Awards Admin
+                UC&D Admin
               </h1>
             </div>
             <nav className="flex space-x-4">
@@ -24,16 +24,22 @@ export default function AdminLayout({
                 Dashboard
               </Link>
               <Link
-                href="/admin/submissions"
+                href="/admin/awards"
                 className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
               >
-                Submissions
+                Awards
+              </Link>
+              <Link
+                href="/admin/surveys"
+                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Surveys
               </Link>
               <Link
                 href="/"
                 className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
               >
-                ← Public Site
+                &larr; Public Site
               </Link>
             </nav>
           </div>
@@ -47,5 +53,3 @@ export default function AdminLayout({
     </div>
   );
 }
-
-

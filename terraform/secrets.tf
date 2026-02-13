@@ -46,6 +46,24 @@ resource "google_secret_manager_secret_version" "sheet_id_version" {
   secret_data = var.master_sheet_id
 }
 
+# Store Survey Sheet ID
+resource "google_secret_manager_secret" "survey_sheet_id" {
+  count     = var.survey_sheet_id != "" ? 1 : 0
+  secret_id = "${local.name_prefix}-survey-sheet-id"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "survey_sheet_id_version" {
+  count       = var.survey_sheet_id != "" ? 1 : 0
+  secret      = google_secret_manager_secret.survey_sheet_id[0].id
+  secret_data = var.survey_sheet_id
+}
+
 # Output secret paths
 output "recaptcha_secret_name" {
   value       = google_secret_manager_secret.recaptcha_secret.id
