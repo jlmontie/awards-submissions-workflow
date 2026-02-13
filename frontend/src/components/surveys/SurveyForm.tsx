@@ -15,6 +15,10 @@ interface SurveyFormProps {
   token: string;
   /** Pre-populated firm name from the recipient record */
   initialFirmName?: string;
+  /** Previously saved draft data to restore */
+  initialDraftData?: Record<string, string | boolean> | null;
+  /** ISO timestamp of last draft save */
+  initialDraftSavedAt?: string | null;
   /** Called after successful submission */
   onSuccess?: () => void;
 }
@@ -26,10 +30,15 @@ export default function SurveyForm({
   deadline,
   token,
   initialFirmName,
+  initialDraftData,
+  initialDraftSavedAt,
   onSuccess,
 }: SurveyFormProps) {
   const [currentSection, setCurrentSection] = useState(0);
   const [data, setData] = useState<Record<string, string | boolean>>(() => {
+    if (initialDraftData) {
+      return { ...initialDraftData };
+    }
     const initial: Record<string, string | boolean> = {};
     if (initialFirmName) {
       initial.firm_name = initialFirmName;
@@ -39,6 +48,8 @@ export default function SurveyForm({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [submitError, setSubmitError] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(initialDraftSavedAt ?? null);
 
   const section = template.sections[currentSection];
   const sectionNames = template.sections.map((s) => s.title);
@@ -76,12 +87,12 @@ export default function SurveyForm({
       // Skip hidden fields
       if (field.hideWhen && data[field.hideWhen]) continue;
 
-      if (field.required && !value && value !== 0) {
+      if (field.required && !value) {
         sectionErrors[field.key] = 'This field is required';
         continue;
       }
 
-      if (!value && value !== 0) continue;
+      if (!value) continue;
       const strValue = String(value).trim();
       if (field.required && strValue === '') {
         sectionErrors[field.key] = 'This field is required';
@@ -136,6 +147,30 @@ export default function SurveyForm({
     setErrors({});
     setCurrentSection((prev) => Math.max(prev - 1, 0));
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function handleSave() {
+    setSaveStatus('saving');
+    try {
+      const response = await fetch('/api/surveys/responses/draft', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, data }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to save draft');
+      }
+
+      const result = await response.json();
+      setLastSavedAt(result.savedAt);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    }
   }
 
   async function handleSubmit() {
@@ -261,34 +296,66 @@ export default function SurveyForm({
       )}
 
       {/* Navigation buttons */}
-      <div className="mt-8 flex justify-between">
-        <button
-          type="button"
-          onClick={handlePrevious}
-          disabled={currentSection === 0}
-          className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Previous
-        </button>
+      <div className="mt-8 grid grid-cols-3 items-start gap-4">
+        <div>
+          <button
+            type="button"
+            onClick={handlePrevious}
+            disabled={currentSection === 0}
+            className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+        </div>
 
-        {isLastSection ? (
+        <div className="flex flex-col items-center">
           <button
             type="button"
-            onClick={handleSubmit}
-            disabled={submitStatus === 'submitting'}
-            className="px-8 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleSave}
+            disabled={saveStatus === 'saving' || submitStatus === 'submitting'}
+            className={`px-6 py-2.5 text-sm font-medium rounded-md border disabled:opacity-50 disabled:cursor-not-allowed ${
+              saveStatus === 'saved'
+                ? 'text-green-700 bg-green-50 border-green-300'
+                : saveStatus === 'error'
+                  ? 'text-red-700 bg-red-50 border-red-300'
+                  : 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50'
+            }`}
           >
-            {submitStatus === 'submitting' ? 'Submitting...' : 'Submit Survey'}
+            {saveStatus === 'saving'
+              ? 'Saving...'
+              : saveStatus === 'saved'
+                ? 'Saved!'
+                : saveStatus === 'error'
+                  ? 'Save failed'
+                  : 'Save Progress'}
           </button>
-        ) : (
-          <button
-            type="button"
-            onClick={handleNext}
-            className="px-8 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700"
-          >
-            Next
-          </button>
-        )}
+          {lastSavedAt && (
+            <p className="mt-1 text-xs text-gray-400">
+              Last saved {new Date(lastSavedAt).toLocaleString()}
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          {isLastSection ? (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitStatus === 'submitting'}
+              className="px-8 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitStatus === 'submitting' ? 'Submitting...' : 'Submit Survey'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleNext}
+              className="px-8 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700"
+            >
+              Next
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

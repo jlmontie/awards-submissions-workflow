@@ -25,13 +25,13 @@ export function validateSurvey(
       }
 
       // Required check
-      if (field.required && !value && value !== 0) {
+      if (field.required && !value) {
         errors[field.key] = 'This field is required';
         continue;
       }
 
       // Skip further validation if empty and not required
-      if (!value && value !== 0) continue;
+      if (!value) continue;
 
       const strValue = String(value).trim();
       if (field.required && strValue === '') {

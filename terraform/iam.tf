@@ -80,6 +80,20 @@ resource "google_project_iam_member" "gcs_pubsub_publisher" {
   member  = "serviceAccount:service-${data.google_project.project.number}@gs-project-accounts.iam.gserviceaccount.com"
 }
 
+# Grant existing ucd-sheets-api service account Storage access
+# This SA is used by the Next.js app at runtime for Sheets, Drive, and Storage
+resource "google_project_iam_member" "ucd_sheets_api_storage" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:ucd-sheets-api@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "ucd_sheets_api_service_usage" {
+  project = var.project_id
+  role    = "roles/serviceusage.serviceUsageConsumer"
+  member  = "serviceAccount:ucd-sheets-api@${var.project_id}.iam.gserviceaccount.com"
+}
+
 # Output service account emails
 output "backend_service_account_email" {
   value       = google_service_account.backend.email

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { getSheetsClient } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -12,14 +12,8 @@ export const runtime = 'nodejs';
  *
  * Sheets layout:
  *   "Surveys" sheet: survey_id | name | category | year | deadline | status | template_id
- *   "Survey Recipients" sheet: recipient_id | survey_id | firm_name | contact_name | contact_email | token | status | ...
+ *   "Survey Recipients" sheet: recipient_id | survey_id | firm_name | token | status | sent_at | reminded_at | completed_at
  */
-async function getSheetsClient() {
-  const auth = new google.auth.GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-  return google.sheets({ version: 'v4', auth });
-}
 
 export async function GET(
   request: NextRequest,
@@ -36,7 +30,7 @@ export async function GET(
       );
     }
 
-    const sheets = await getSheetsClient();
+    const sheets = await getSheetsClient(true);
 
     // Fetch recipients sheet
     const recipientsRes = await sheets.spreadsheets.values.get({
@@ -52,8 +46,9 @@ export async function GET(
     const tokenCol = recipientHeaders.indexOf('token');
     const surveyIdCol = recipientHeaders.indexOf('survey_id');
     const firmNameCol = recipientHeaders.indexOf('firm_name');
-    const contactNameCol = recipientHeaders.indexOf('contact_name');
     const statusCol = recipientHeaders.indexOf('status');
+    const draftDataCol = recipientHeaders.indexOf('draft_data');
+    const draftSavedAtCol = recipientHeaders.indexOf('draft_saved_at');
 
     if (tokenCol === -1) {
       return NextResponse.json({ error: 'Invalid sheet configuration' }, { status: 500 });
@@ -106,6 +101,18 @@ export async function GET(
       );
     }
 
+    // Parse draft data safely
+    let draftData: Record<string, string | boolean> | null = null;
+    if (draftDataCol !== -1 && recipientRow[draftDataCol]) {
+      try {
+        draftData = JSON.parse(recipientRow[draftDataCol]);
+      } catch {
+        // Ignore corrupt draft data
+      }
+    }
+    const draftSavedAt =
+      draftSavedAtCol !== -1 ? recipientRow[draftSavedAtCol] || null : null;
+
     return NextResponse.json({
       survey: {
         surveyId: surveyRow[sIdCol] || '',
@@ -116,7 +123,8 @@ export async function GET(
       },
       recipient: {
         firmName: recipientRow[firmNameCol] || '',
-        contactName: recipientRow[contactNameCol] || '',
+        draftData,
+        draftSavedAt,
       },
     });
   } catch (error: any) {

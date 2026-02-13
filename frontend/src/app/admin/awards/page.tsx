@@ -34,7 +34,7 @@ function SubmissionsContent() {
     try {
       const res = await fetch(`/api/awards/admin/submissions?filter=${filter}`);
       const data = await res.json();
-      setSubmissions(data);
+      setSubmissions(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error loading submissions:', error);
     } finally {
@@ -77,6 +77,18 @@ function SubmissionsContent() {
           <p className="mt-2 text-sm text-gray-700">
             All awards submissions for review and management
           </p>
+        </div>
+        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+          <Link
+            href="/awards"
+            target="_blank"
+            className="inline-flex items-center gap-1 rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          >
+            Public Submissions Page
+            <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </Link>
         </div>
       </div>
 

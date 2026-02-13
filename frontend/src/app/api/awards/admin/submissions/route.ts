@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { google } from 'googleapis';
+import { getSheetsClient } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -17,11 +17,7 @@ interface Submission {
 }
 
 async function getSheetData() {
-  const auth = new google.auth.GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
-  });
-
-  const sheets = google.sheets({ version: 'v4', auth });
+  const sheets = await getSheetsClient(true);
   const spreadsheetId = process.env.SHEET_ID;
 
   const response = await sheets.spreadsheets.values.get({

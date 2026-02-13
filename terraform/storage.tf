@@ -3,8 +3,10 @@ resource "google_storage_bucket" "submissions" {
   name          = "${local.name_prefix}-submissions-${local.name_suffix}"
   location      = var.storage_location
   storage_class = var.storage_class
-  
+
   uniform_bucket_level_access = true
+
+  depends_on = [google_project_service.required_apis]
   
   labels = local.common_labels
 
@@ -37,8 +39,10 @@ resource "google_storage_bucket" "functions_source" {
   name          = "${local.name_prefix}-functions-${local.name_suffix}"
   location      = var.region
   storage_class = "STANDARD"
-  
+
   uniform_bucket_level_access = true
+
+  depends_on = [google_project_service.required_apis]
   
   labels = local.common_labels
 
@@ -58,8 +62,10 @@ resource "google_storage_bucket" "public_assets" {
   name          = "${local.name_prefix}-public-${local.name_suffix}"
   location      = var.region
   storage_class = "STANDARD"
-  
+
   uniform_bucket_level_access = true
+
+  depends_on = [google_project_service.required_apis]
   
   labels = local.common_labels
 
