@@ -61,6 +61,11 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name  = "SURVEY_SHEET_ID"
+        value = var.survey_sheet_id
+      }
+
+      env {
         name  = "NODE_ENV"
         value = "production"
       }
