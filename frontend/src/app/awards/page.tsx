@@ -39,7 +39,7 @@ export default function AwardsPage() {
           <h2 className="text-4xl font-heading font-bold text-black mb-6">
             Submission Instructions
           </h2>
-          <ol className="list-decimal list-inside space-y-3 text-base font-light" style={{ color: '#666' }}>
+          <ol className="list-decimal list-inside space-y-3 text-base font-light text-gray-500">
             <li>
               Download the blank submission form below and fill it out completely
             </li>
@@ -112,7 +112,7 @@ export default function AwardsPage() {
 
         {/* Footer */}
         <footer className="mt-16 pt-8 border-t-2 border-secondary-400 text-center">
-          <p className="text-base font-light" style={{ color: '#666' }}>
+          <p className="text-base font-light text-gray-500">
             Need help? Contact us at{' '}
             <a
               href="mailto:awards@example.com"

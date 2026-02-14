@@ -6,6 +6,9 @@ region     = "us-central1"
 drive_root_folder_id = "your-google-drive-folder-id"  # Get from Drive URL
 master_sheet_id      = "your-google-sheet-id"         # Get from Sheets URL
 
+# Google Service Account
+google_service_account_key_file = "your-api-key-json-filepath"
+
 # Domain Configuration (optional - for custom domain)
 domain = "awards.yourcompany.com"  # Leave empty to use default Cloud Run URL
 
@@ -28,6 +31,10 @@ environment = "production"  # or "staging", "dev"
 storage_location      = "US"  # or "EU", "ASIA"
 storage_class         = "STANDARD"
 lifecycle_delete_days = 365  # Delete old submissions after 1 year
+
+# Google Service Account Key (for Sheets/Drive API access)
+# Provide the full JSON key file contents as a string
+# google_service_account_key = file("/path/to/uc-and-d-sheets-api-key.json")
 
 # Limits
 max_pdf_size_mb   = 50

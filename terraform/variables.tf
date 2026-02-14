@@ -88,3 +88,8 @@ variable "survey_sheet_id" {
   default     = ""
 }
 
+variable "google_service_account_key_file" {
+  description = "Path to Google service account key JSON file for Sheets/Drive API access"
+  type        = string
+}
+

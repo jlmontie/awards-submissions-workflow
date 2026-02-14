@@ -73,7 +73,7 @@ function SubmissionsContent() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Submissions</h1>
+          <h1 className="text-2xl font-heading font-semibold text-navy-500">Submissions</h1>
           <p className="mt-2 text-sm text-gray-700">
             All awards submissions for review and management
           </p>
@@ -99,7 +99,7 @@ function SubmissionsContent() {
             onClick={() => router.push('/admin/awards?filter=all')}
             className={`relative inline-flex items-center rounded-l-md px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'all'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-navy-500 text-white'
                 : 'bg-white text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -109,7 +109,7 @@ function SubmissionsContent() {
             onClick={() => router.push('/admin/awards?filter=pending')}
             className={`relative -ml-px inline-flex items-center px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'pending'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-navy-500 text-white'
                 : 'bg-white text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -119,7 +119,7 @@ function SubmissionsContent() {
             onClick={() => router.push('/admin/awards?filter=winners')}
             className={`relative -ml-px inline-flex items-center rounded-r-md px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'winners'
-                ? 'bg-blue-600 text-white'
+                ? 'bg-navy-500 text-white'
                 : 'bg-white text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -133,7 +133,7 @@ function SubmissionsContent() {
             placeholder="Search by ID, project name, or firm..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-4 py-2 border"
+            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-4 py-2 border"
           />
         </div>
       </div>
@@ -200,7 +200,7 @@ function SubmissionsContent() {
                     <td className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap">
                       <Link
                         href={`/admin/awards/${submission.awardsId}`}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-charcoal-500 hover:text-secondary-400"
                       >
                         View
                       </Link>

@@ -62,7 +62,7 @@ export default function NewSurveyPage() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-heading font-semibold text-navy-500">
             Create New Survey
           </h1>
           <p className="mt-2 text-sm text-gray-700">
@@ -82,7 +82,7 @@ export default function NewSurveyPage() {
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-6">
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">
+          <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">
             Survey Details
           </h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -93,7 +93,7 @@ export default function NewSurveyPage() {
               <select
                 value={templateId}
                 onChange={(e) => handleTemplateChange(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
               >
                 <option value="architects">Architects</option>
               </select>
@@ -108,7 +108,7 @@ export default function NewSurveyPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
               />
             </div>
 
@@ -121,7 +121,7 @@ export default function NewSurveyPage() {
                 value={year}
                 onChange={(e) => handleYearChange(parseInt(e.target.value, 10))}
                 required
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
               />
             </div>
 
@@ -133,22 +133,22 @@ export default function NewSurveyPage() {
                 type="date"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
               />
             </div>
           </div>
         </div>
 
         {/* Info box about importing recipients */}
-        <div className="rounded-md bg-blue-50 p-4">
+        <div className="rounded-md bg-primary-50 p-4">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-5 w-5 text-secondary-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
-              <p className="text-sm text-blue-700">
+              <p className="text-sm text-navy-500">
                 After creating the survey, import recipients from the master
                 contact list on the survey detail page.
               </p>
@@ -166,7 +166,7 @@ export default function NewSurveyPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Creating...' : 'Create Survey'}
           </button>

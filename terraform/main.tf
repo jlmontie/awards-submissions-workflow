@@ -65,11 +65,13 @@ resource "random_id" "suffix" {
 locals {
   name_prefix = "awards-${var.environment}"
   name_suffix = random_id.suffix.hex
-  
+
   common_labels = {
     environment = var.environment
     managed_by  = "terraform"
     project     = "awards-submissions"
   }
+
+  google_service_account_key = file(var.google_service_account_key_file)
 }
 

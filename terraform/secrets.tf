@@ -72,6 +72,24 @@ resource "google_secret_manager_secret_version" "survey_sheet_id_version" {
   secret_data = var.survey_sheet_id
 }
 
+# Store Google service account key for Sheets/Drive API access
+resource "google_secret_manager_secret" "sheets_sa_key" {
+  secret_id = "${local.name_prefix}-sheets-sa-key"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required_apis]
+}
+
+resource "google_secret_manager_secret_version" "sheets_sa_key_version" {
+  secret      = google_secret_manager_secret.sheets_sa_key.id
+  secret_data = local.google_service_account_key
+}
+
 # Output secret paths
 output "recaptcha_secret_name" {
   value       = google_secret_manager_secret.recaptcha_secret.id

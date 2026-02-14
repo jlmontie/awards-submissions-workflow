@@ -12,11 +12,11 @@ export default function AdminNav() {
   ];
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-navy-500 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Link href="/admin" className="text-xl font-bold text-gray-900 hover:text-gray-700">
+            <Link href="/admin" className="text-xl font-heading font-bold text-white hover:text-secondary-400 transition-colors">
               UC+D Admin
             </Link>
           </div>
@@ -29,8 +29,8 @@ export default function AdminNav() {
                   href={href}
                   className={
                     isActive
-                      ? 'text-blue-600 bg-blue-50 px-3 py-2 rounded-md text-sm font-medium'
-                      : 'text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium'
+                      ? 'text-primary-500 bg-white/10 px-3 py-2 rounded-md text-sm font-medium'
+                      : 'text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium'
                   }
                 >
                   {label}
