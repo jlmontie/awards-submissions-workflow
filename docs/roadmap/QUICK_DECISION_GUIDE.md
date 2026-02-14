@@ -1,4 +1,4 @@
-# UC&D Platform - Quick Decision Guide
+# UC+D Platform - Quick Decision Guide
 
 ## The Situation in One Minute
 
@@ -161,7 +161,7 @@ As your developer, here's what I think:
 
 ### You should do the **Unified Platform** if:
 - ✅ You're tired of manual survey work
-- ✅ You want to modernize UC&D operations
+- ✅ You want to modernize UC+D operations
 - ✅ You see value in a long-term platform
 - ✅ Budget allows ~$10k investment
 
@@ -209,10 +209,10 @@ As your developer, here's what I think:
 2. **How annoying is the awards ID issue?**
    - If it causes problems every awards cycle → Should fix soon
 
-3. **What other UC&D processes could I automate?**
+3. **What other UC+D processes could I automate?**
    - If you have a list → Unified platform makes more sense
 
-4. **Am I planning to grow UC&D's offerings?**
+4. **Am I planning to grow UC+D's offerings?**
    - If yes → Platform approach is more scalable
 
 5. **How tech-savvy are the firms I work with?**

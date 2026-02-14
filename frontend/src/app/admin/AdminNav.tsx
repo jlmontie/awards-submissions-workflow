@@ -17,7 +17,7 @@ export default function AdminNav() {
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
             <Link href="/admin" className="text-xl font-bold text-gray-900 hover:text-gray-700">
-              UC&D Admin
+              UC+D Admin
             </Link>
           </div>
           <nav className="flex space-x-4">

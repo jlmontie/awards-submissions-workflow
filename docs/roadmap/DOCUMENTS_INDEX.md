@@ -1,7 +1,7 @@
-# UC&D Project Documentation - Complete Index
+# UC+D Project Documentation - Complete Index
 
 **Created:** December 18, 2025  
-**Purpose:** Help you organize and clarify the complete scope of the UC&D project
+**Purpose:** Help you organize and clarify the complete scope of the UC+D project
 
 ---
 
@@ -414,7 +414,7 @@ jlmontie@gmail.com
 
 **Your reading time:** 30-60 minutes (depending on path)
 
-**Result:** You can make an informed decision about your UC&D automation needs
+**Result:** You can make an informed decision about your UC+D automation needs
 
 ---
 

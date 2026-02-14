@@ -1,4 +1,4 @@
-# UC&D Project Overview & Documentation Index
+# UC+D Project Overview & Documentation Index
 
 **Last Updated:** December 18, 2025
 
@@ -6,7 +6,7 @@
 
 ## 📖 What's in This Folder
 
-This analysis covers your complete UC&D automation needs, including:
+This analysis covers your complete UC+D automation needs, including:
 - The current **Awards Submission System** (working)
 - Missing **Awards ID linkage** (needs fixing)
 - Separate **Survey automation** (completely manual now)
@@ -445,7 +445,7 @@ That's fine! Take time to:
 - $35/month hosting
 - Saves 34+ hours/year
 - Pays for itself in 4-5 years
-- But really: Saves you headaches and modernizes UC&D
+- But really: Saves you headaches and modernizes UC+D
 
 **Next Step:**
 Email me with your thoughts!
@@ -455,5 +455,5 @@ Email me with your thoughts!
 **Prepared by:** Jesse Montgomery  
 **Date:** December 18, 2025  
 **Contact:** jlmontie@gmail.com  
-**Project:** UC&D Business Tools Platform
+**Project:** UC+D Business Tools Platform
 

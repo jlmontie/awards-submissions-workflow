@@ -3,7 +3,7 @@ Survey Export: Generates tab-delimited text files from survey responses.
 
 Reads completed survey responses from Google Sheets and produces
 publication-ready tab-delimited text files matching the format used
-by UC&D's graphic designer for InDesign layout.
+by UC+D's graphic designer for InDesign layout.
 
 Usage (local):
     export GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json

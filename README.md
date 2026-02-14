@@ -9,7 +9,7 @@ A production-grade, scalable system for handling construction awards submissions
 
 ## 📢 NEW: Unified Platform Development - Phase 1 Complete! ✅
 
-**Looking to expand beyond awards?** We've analyzed the complete UC&D automation needs, and we're now building the unified platform!
+**Looking to expand beyond awards?** We've analyzed the complete UC+D automation needs, and we're now building the unified platform!
 
 ### 🎉 Phase 1: Awards ID System Enhancement - COMPLETE
 ✅ Unique submission IDs (AW-YYYY-NNN format)  

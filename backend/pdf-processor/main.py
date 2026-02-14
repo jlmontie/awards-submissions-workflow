@@ -509,7 +509,7 @@ Phone: 801-872-3531
 Thank you for your participation in celebrating excellence in Utah construction!
 
 Best regards,
-The UC&D Awards Team
+The UC+D Awards Team
 
 ---
 Submission ID: {awards_id}

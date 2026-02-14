@@ -1,4 +1,4 @@
-# UC&D Platform - Data Architecture Analysis
+# UC+D Platform - Data Architecture Analysis
 
 **Question:** Should we use a database or continue with Google Sheets?  
 **Context:** Cost management is critical - these are annual/seasonal activities

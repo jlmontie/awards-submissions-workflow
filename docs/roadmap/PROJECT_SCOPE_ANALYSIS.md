@@ -1,14 +1,14 @@
-# Utah Construction & Design (UC&D) - Complete Project Scope Analysis
+# Utah Construction & Design (UC+D) - Complete Project Scope Analysis
 
 **Date:** December 18, 2025  
-**Prepared for:** Ladd Marshall - UC&D  
+**Prepared for:** Ladd Marshall - UC+D  
 **Prepared by:** Jesse Montgomery
 
 ---
 
 ## Executive Summary
 
-UC&D currently has **three separate workflows** that need automation and integration:
+UC+D currently has **three separate workflows** that need automation and integration:
 
 1. **Awards Submission Processing** (✅ Complete - Current System)
 2. **Awards Winner Tracking** (⚠️ Partial - Missing ID linkage)
@@ -82,7 +82,7 @@ Winners Sheet (filtered view or separate):
 
 ### Status: ❌ **COMPLETELY MANUAL - NEEDS AUTOMATION**
 
-### What UC&D Does Manually:
+### What UC+D Does Manually:
 Based on the "survey project tool" email from Nov 21, 2025:
 
 1. **Three Annual Surveys:**
@@ -136,13 +136,13 @@ All three workflows use similar technology:
 
 ## 5. Proposed Solution Options
 
-### **Option 1: Unified UC&D Business Tools Platform** ⭐ RECOMMENDED
+### **Option 1: Unified UC+D Business Tools Platform** ⭐ RECOMMENDED
 
 Create a central web portal with three integrated modules:
 
 #### **Portal Structure:**
 ```
-UC&D Business Tools Platform (utahcdtools.com or tools.utahcdmag.com)
+UC+D Business Tools Platform (utahcdtools.com or tools.utahcdmag.com)
 │
 ├── 📊 Awards Module
 │   ├── Public Submission Form
@@ -262,7 +262,7 @@ For surveys only, use Google's native tools:
    - No duplicate systems
 
 ### **Proposed Portal Name:**
-- **UC&D Business Tools** or **UC&D Connect**
+- **UC+D Business Tools** or **UC+D Connect**
 - URL: `tools.utahcdmag.com` or `connect.utahcdmag.com`
 
 ---
@@ -391,7 +391,7 @@ Admin Dashboard:
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│         UC&D Business Tools Web Portal              │
+│         UC+D Business Tools Web Portal              │
 │              (Next.js + React)                       │
 └───────────┬─────────────────────────────────────────┘
             │
@@ -538,7 +538,7 @@ Admin Dashboard:
 ### **Overall Platform:**
 - Single sign-on reduces context switching
 - Historical data enables trend analysis
-- Professional appearance enhances UC&D brand
+- Professional appearance enhances UC+D brand
 
 ---
 
@@ -567,7 +567,7 @@ Admin Dashboard:
    - How many years back?
 
 6. **Integration:**
-   - Any other UC&D workflows that could benefit from automation?
+   - Any other UC+D workflows that could benefit from automation?
    - Magazine submission portal?
    - Event registration?
 
@@ -638,5 +638,5 @@ I'm happy to schedule a call to discuss in detail and refine the approach based 
 **Contact:**
 Jesse Montgomery  
 Email: jlmontie@gmail.com  
-Re: UC&D Platform Expansion
+Re: UC+D Platform Expansion
 
