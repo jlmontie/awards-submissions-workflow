@@ -1,4 +1,4 @@
-# UC&D Platform Options - Visual Comparison
+# UC+D Platform Options - Visual Comparison
 
 **Date:** December 18, 2025
 
@@ -28,7 +28,7 @@
 ║  OPTION A: UNIFIED PLATFORM ⭐ RECOMMENDED                         ║
 ║                                                                    ║
 ║  ┌────────────────────────────────────────────────────┐            ║
-║  │  UC&D Business Tools Platform                      │            ║
+║  │  UC+D Business Tools Platform                      │            ║
 ║  │                                                    │            ║
 ║  │  📊 Awards Module (with IDs)                      │            ║
 ║  │  📋 Survey Module (full automation)               │            ║

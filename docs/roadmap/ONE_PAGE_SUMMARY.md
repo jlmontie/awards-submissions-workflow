@@ -1,4 +1,4 @@
-# UC&D Platform Project - One Page Summary
+# UC+D Platform Project - One Page Summary
 
 **Date:** December 18, 2025 | **For:** Ladd Marshall | **From:** Jesse Montgomery
 
@@ -190,13 +190,13 @@ Then decide if you want the full platform.
 ### ACI Intermountain Chapter:
 - Uses third-party form system (constant contact)
 - Less control, ongoing fees
-- **UC&D approach is better:** owned system, no per-submission fees
+- **UC+D approach is better:** owned system, no per-submission fees
 
 ### Industry Trend:
 - Moving away from PDF/email workflows
 - Web-based submission is standard
 - Automated tracking is expected
-- **UC&D would be ahead of the curve**
+- **UC+D would be ahead of the curve**
 
 ---
 

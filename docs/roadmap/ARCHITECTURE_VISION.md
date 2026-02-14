@@ -1,4 +1,4 @@
-# UC&D Business Tools Platform - Architecture Vision
+# UC+D Business Tools Platform - Architecture Vision
 
 ## Current State (Awards Only)
 
@@ -75,7 +75,7 @@
 ```
 ┌────────────────────────────────────────────────────────────────┐
 │                                                                │
-│         UC&D BUSINESS TOOLS PLATFORM                           │
+│         UC+D BUSINESS TOOLS PLATFORM                           │
 │         (tools.utahcdmag.com)                                  │
 │                                                                │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────┐ │
@@ -524,7 +524,7 @@ All interfaces are mobile-responsive:
 
 ```
 ┌──────────────────┐
-│ ☰  UC&D Tools    │  ← Mobile nav
+│ ☰  UC+D Tools    │  ← Mobile nav
 ├──────────────────┤
 │                  │
 │  📊 Awards       │
@@ -761,7 +761,7 @@ Very economical for the value!
   - Team collaboration
 
 🔗 API Access
-  - Integrate with UC&D website
+  - Integrate with UC+D website
   - Partner integrations
   - Third-party tools
 ```

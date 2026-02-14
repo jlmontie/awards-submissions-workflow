@@ -15,7 +15,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: 'UC&D Tools',
+  title: 'UC+D Tools',
   description: 'Utah Construction & Design business tools platform',
 };
 

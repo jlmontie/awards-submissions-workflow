@@ -1,6 +1,6 @@
-# UC&D Unified Platform - Implementation Plan
+# UC+D Unified Platform - Implementation Plan
 
-**Project:** UC&D Business Tools Platform  
+**Project:** UC+D Business Tools Platform  
 **Timeline:** 12 weeks (January - March 2026)  
 **Developer:** Jesse Montgomery  
 **Client:** Ladd Marshall - Utah Construction & Design
@@ -453,9 +453,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <img src="/ucd-logo.png" alt="UC&D" className="mx-auto h-12" />
+          <img src="/ucd-logo.png" alt="UC+D" className="mx-auto h-12" />
           <h2 className="mt-6 text-center text-3xl font-bold">
-            UC&D Admin Portal
+            UC+D Admin Portal
           </h2>
         </div>
         <form onSubmit={handleLogin} className="mt-8 space-y-6">
@@ -582,7 +582,7 @@ export default function Sidebar() {
   return (
     <div className="fixed left-0 top-0 h-full w-64 bg-white border-r">
       <div className="p-6">
-        <img src="/ucd-logo.png" alt="UC&D" className="h-8" />
+        <img src="/ucd-logo.png" alt="UC+D" className="h-8" />
       </div>
       
       <nav className="px-3">
@@ -1499,7 +1499,7 @@ def send_email(survey, recipient):
         <html>
         <body style="font-family: Arial, sans-serif;">
             <div style="max-width: 600px; margin: 0 auto;">
-                <img src="https://www.utahcdmag.com/logo.png" alt="UC&D" style="height: 60px; margin-bottom: 20px;">
+                <img src="https://www.utahcdmag.com/logo.png" alt="UC+D" style="height: 60px; margin-bottom: 20px;">
                 
                 <h1>Survey Invitation</h1>
                 
@@ -1659,7 +1659,7 @@ export default function SurveyResponsePage({ params }) {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg p-8 mb-6">
-          <img src="/ucd-logo.png" alt="UC&D" className="h-12 mb-4" />
+          <img src="/ucd-logo.png" alt="UC+D" className="h-12 mb-4" />
           <h1 className="text-3xl font-bold">{survey.name}</h1>
           <p className="text-gray-600 mt-2">
             Deadline: {formatDate(survey.deadline)}

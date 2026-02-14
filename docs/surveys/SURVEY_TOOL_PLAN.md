@@ -8,7 +8,7 @@
 
 ## Context
 
-Ladd Marshall (UC&D) currently distributes annual ranking surveys to three groups
+Ladd Marshall (UC+D) currently distributes annual ranking surveys to three groups
 (Architects, GCs, Engineers) as fillable PDFs via email. Recipients fill them out and
 email them back. The results are manually compiled into ranked tables published in
 the magazine.
@@ -77,7 +77,7 @@ the frontend routing.
 
 Everything lives at the root level and is awards-specific. The root layout
 metadata says "Most Outstanding Projects Competition" and the admin header
-says "UC&D Awards Admin."
+says "UC+D Awards Admin."
 
 ### 1.2 Proposed Frontend Route Structure
 
@@ -164,7 +164,7 @@ frontend/src/
 │
 ├── components/
 │   ├── shared/                             # Cross-tool components
-│   │   ├── PlatformHeader.tsx              # UC&D branding header
+│   │   ├── PlatformHeader.tsx              # UC+D branding header
 │   │   ├── AdminNav.tsx                    # Admin sidebar/top nav with tool links
 │   │   └── RecaptchaLoader.tsx             # Existing, shared
 │   │
@@ -196,7 +196,7 @@ frontend/src/
 ### 1.4 Root Layout & Landing Page Changes
 
 **Root layout** (`layout.tsx`): Change metadata from "Most Outstanding Projects
-Competition" to a generic platform title (e.g., "UC&D Tools" or
+Competition" to a generic platform title (e.g., "UC+D Tools" or
 "Utah Construction & Design"). Keep fonts and globals.
 
 **Landing page** (`page.tsx`): Replace the awards submission form with a simple
@@ -208,7 +208,7 @@ tool selector page. Two cards:
 ### 1.5 Admin Layout Changes
 
 Update `admin/layout.tsx`:
-- Change header from "UC&D Awards Admin" to "UC&D Admin"
+- Change header from "UC+D Awards Admin" to "UC+D Admin"
 - Add tool navigation: **Dashboard** | **Awards** | **Surveys** | (future tools)
 - Keep "Public Site" link
 
@@ -319,7 +319,7 @@ category-specific field variations).
 pre-populated with their firm name (from the recipient list).
 
 **Form behavior:**
-- UC&D branding header with survey title and deadline
+- UC+D branding header with survey title and deadline
 - Sectioned form matching the PDF layout (General Info, Revenues, Projects, Markets)
 - Client-side validation (required fields, percentage sum = 100%, valid numbers)
 - "Decline to disclose" checkbox for revenue (hides revenue fields)
