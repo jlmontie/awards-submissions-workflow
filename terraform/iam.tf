@@ -94,6 +94,13 @@ resource "google_project_iam_member" "ucd_sheets_api_service_usage" {
   member  = "serviceAccount:ucd-sheets-api@${var.project_id}.iam.gserviceaccount.com"
 }
 
+# Grant frontend access to the Sheets SA key secret
+resource "google_secret_manager_secret_iam_member" "frontend_sheets_sa_key" {
+  secret_id = google_secret_manager_secret.sheets_sa_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.frontend.email}"
+}
+
 # Output service account emails
 output "backend_service_account_email" {
   value       = google_service_account.backend.email

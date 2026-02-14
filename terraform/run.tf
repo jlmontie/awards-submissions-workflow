@@ -66,6 +66,16 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name = "GOOGLE_SERVICE_ACCOUNT_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.sheets_sa_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
         name  = "NODE_ENV"
         value = "production"
       }
