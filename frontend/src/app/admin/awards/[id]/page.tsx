@@ -68,7 +68,7 @@ export default function SubmissionDetailPage() {
       <div className="px-4 sm:px-6 lg:px-8 py-12">
         <p className="text-center text-gray-500">Submission not found</p>
         <div className="mt-4 text-center">
-          <Link href="/admin/awards" className="text-blue-600 hover:text-blue-900">
+          <Link href="/admin/awards" className="text-charcoal-500 hover:text-secondary-400">
             &larr; Back to submissions
           </Link>
         </div>
@@ -88,7 +88,7 @@ export default function SubmissionDetailPage() {
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-2xl font-heading font-semibold text-navy-500">
               {submission['Official Name'] || 'Unnamed Project'}
             </h1>
             <p className="mt-1 text-sm text-gray-500">
@@ -106,7 +106,7 @@ export default function SubmissionDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {/* Quick Links */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+            <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Quick Actions</h2>
             <div className="flex gap-4">
               {submission['PDF Link'] && (
                 <a
@@ -139,7 +139,7 @@ export default function SubmissionDetailPage() {
 
           {/* Project Details */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Project Details</h2>
+            <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Project Details</h2>
             <dl className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
               <div>
                 <dt className="text-sm font-medium text-gray-500">Location</dt>
@@ -170,7 +170,7 @@ export default function SubmissionDetailPage() {
 
           {/* Team Information */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Team</h2>
+            <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Team</h2>
 
             <div className="space-y-4">
               <div>
@@ -231,7 +231,7 @@ export default function SubmissionDetailPage() {
         <div className="space-y-6">
           {/* Mark as Winner */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Winner Status</h2>
+            <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Winner Status</h2>
 
             <div className="space-y-4">
               <div>
@@ -243,7 +243,7 @@ export default function SubmissionDetailPage() {
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   placeholder="e.g., Best Concrete Project"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm px-3 py-2 border"
                 />
               </div>
 
@@ -256,14 +256,14 @@ export default function SubmissionDetailPage() {
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Judge comments or notes..."
                   rows={3}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm px-3 py-2 border"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm px-3 py-2 border"
                 />
               </div>
 
               <button
                 onClick={() => {/* TODO: Implement */}}
                 disabled={marking || !category}
-                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-primary-500 hover:bg-black hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {marking ? 'Updating...' : 'Mark as Winner'}
               </button>
@@ -272,7 +272,7 @@ export default function SubmissionDetailPage() {
                 <button
                   onClick={() => {/* TODO: Implement */}}
                   disabled={marking}
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
                 >
                   Remove Winner Status
                 </button>

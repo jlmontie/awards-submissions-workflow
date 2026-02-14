@@ -174,7 +174,7 @@ export default function ResultsPage() {
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">
+          <h1 className="text-2xl font-heading font-semibold text-navy-500">
             Results: {surveyName || surveyId}
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -191,7 +191,7 @@ export default function ResultsPage() {
           <button
             onClick={handleDownload}
             disabled={!!error}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
           >
             Download Export (.txt)
           </button>
@@ -219,7 +219,7 @@ export default function ResultsPage() {
         /* Ranked Table Preview */
         <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">
+            <h2 className="text-lg font-heading font-medium text-navy-500">
               Ranked Firms ({firms.length})
             </h2>
           </div>

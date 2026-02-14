@@ -74,7 +74,7 @@ export default function SurveyPage() {
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h1 className="mt-4 text-lg font-semibold text-gray-900">Survey Unavailable</h1>
+          <h1 className="mt-4 text-lg font-heading font-semibold text-navy-500">Survey Unavailable</h1>
           <p className="mt-2 text-sm text-gray-500">{error}</p>
         </div>
       </main>
@@ -95,7 +95,7 @@ export default function SurveyPage() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
+      <header className="bg-navy-500">
         <div className="max-w-3xl mx-auto px-6 py-6">
           <div className="flex items-center justify-center mb-4">
             <img
@@ -104,14 +104,14 @@ export default function SurveyPage() {
               className="h-12 w-auto"
             />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 text-center">
+          <h1 className="text-2xl font-heading font-bold text-white text-center">
             {surveyInfo.survey.name}
           </h1>
-          <p className="mt-1 text-sm text-gray-500 text-center">
+          <p className="mt-1 text-sm text-gray-300 text-center">
             Due: {surveyInfo.survey.deadline}
           </p>
           {surveyInfo.recipient.firmName && (
-            <p className="mt-2 text-sm text-gray-600 text-center">
+            <p className="mt-2 text-sm text-gray-300 text-center">
               Survey for {surveyInfo.recipient.firmName}
             </p>
           )}

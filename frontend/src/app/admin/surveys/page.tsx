@@ -67,7 +67,7 @@ export default function SurveysAdminPage() {
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
         <div className="sm:flex-auto">
-          <h1 className="text-2xl font-semibold text-gray-900">Surveys</h1>
+          <h1 className="text-2xl font-heading font-semibold text-navy-500">Surveys</h1>
           <p className="mt-2 text-sm text-gray-700">
             Manage firm rankings surveys for Architects, GC&apos;s, and Engineers
           </p>
@@ -75,7 +75,7 @@ export default function SurveysAdminPage() {
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
           <Link
             href="/admin/surveys/new"
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors"
           >
             New Survey
           </Link>
@@ -92,7 +92,7 @@ export default function SurveysAdminPage() {
               i === 0 ? 'rounded-l-md' : '-ml-px'
             } ${i === arr.length - 1 ? 'rounded-r-md' : ''} ${
               filter === f
-                ? 'bg-blue-600 text-white'
+                ? 'bg-navy-500 text-white'
                 : 'bg-white text-gray-900 hover:bg-gray-50'
             }`}
           >
@@ -126,7 +126,7 @@ export default function SurveysAdminPage() {
             <p className="mt-4 text-gray-500">No surveys found</p>
             <Link
               href="/admin/surveys/new"
-              className="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-900"
+              className="mt-2 inline-flex text-sm text-charcoal-500 hover:text-secondary-400"
             >
               Create your first survey
             </Link>
@@ -186,7 +186,7 @@ export default function SurveysAdminPage() {
                     >
                       <Link
                         href={`/admin/surveys/${survey.surveyId}`}
-                        className="text-blue-600 hover:text-blue-900"
+                        className="text-charcoal-500 hover:text-secondary-400"
                       >
                         View
                       </Link>

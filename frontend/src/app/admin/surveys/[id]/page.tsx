@@ -183,8 +183,8 @@ export default function SurveyDetailPage() {
       active: 'bg-green-100 text-green-800',
       closed: 'bg-gray-100 text-gray-800',
       pending: 'bg-yellow-100 text-yellow-800',
-      sent: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-blue-100 text-blue-800',
+      sent: 'bg-primary-100 text-primary-800',
+      in_progress: 'bg-primary-100 text-primary-800',
       completed: 'bg-green-100 text-green-800',
     };
     return (
@@ -221,7 +221,7 @@ export default function SurveyDetailPage() {
           <p className="text-gray-500">Survey not found</p>
           <Link
             href="/admin/surveys"
-            className="mt-2 inline-flex text-sm text-blue-600 hover:text-blue-900"
+            className="mt-2 inline-flex text-sm text-charcoal-500 hover:text-secondary-400"
           >
             Back to surveys
           </Link>
@@ -252,7 +252,7 @@ export default function SurveyDetailPage() {
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold text-gray-900">
+            <h1 className="text-2xl font-heading font-semibold text-navy-500">
               {survey.name}
             </h1>
             {getStatusBadge(survey.status)}
@@ -266,7 +266,7 @@ export default function SurveyDetailPage() {
             <button
               onClick={() => updateStatus('active')}
               disabled={statusLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 disabled:opacity-50 transition-colors"
             >
               Activate
             </button>
@@ -282,7 +282,7 @@ export default function SurveyDetailPage() {
           )}
           <Link
             href={`/admin/surveys/${surveyId}/results`}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors"
           >
             Export Results
           </Link>
@@ -354,7 +354,7 @@ export default function SurveyDetailPage() {
         <button
           onClick={handleImport}
           disabled={importing}
-          className="inline-flex items-center justify-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+          className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
         >
           {importing ? 'Importing...' : 'Import Recipients from Contact List'}
         </button>
@@ -364,14 +364,14 @@ export default function SurveyDetailPage() {
             <button
               onClick={handleMarkSent}
               disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors disabled:opacity-50"
             >
               {actionLoading ? 'Updating...' : `Mark as Sent (${selected.size})`}
             </button>
             <button
               onClick={handleMarkReminded}
               disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-amber-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-amber-700 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-secondary-400 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-secondary-600 transition-colors disabled:opacity-50"
             >
               {actionLoading ? 'Updating...' : `Mark Reminded (${selected.size})`}
             </button>
@@ -382,7 +382,7 @@ export default function SurveyDetailPage() {
       {/* Firm-Level Tracker Table */}
       <div className="mt-6 bg-white shadow rounded-lg overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900">
+          <h2 className="text-lg font-heading font-medium text-navy-500">
             Firm Tracker
           </h2>
         </div>
@@ -403,7 +403,7 @@ export default function SurveyDetailPage() {
                       type="checkbox"
                       checked={selected.size === recipients.length && recipients.length > 0}
                       onChange={toggleSelectAll}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                     />
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -445,7 +445,7 @@ export default function SurveyDetailPage() {
                           type="checkbox"
                           checked={selected.has(r.recipientId)}
                           onChange={() => toggleSelect(r.recipientId)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
                         />
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900 font-medium">
@@ -496,7 +496,7 @@ export default function SurveyDetailPage() {
                     {expandedFirms.has(r.recipientId) && r.contacts.length > 0 && (
                       <tr key={`${r.recipientId}-contacts`}>
                         <td colSpan={8} className="px-4 py-0">
-                          <div className="ml-10 py-2 border-l-2 border-blue-200 pl-4">
+                          <div className="ml-10 py-2 border-l-2 border-secondary-400 pl-4">
                             <p className="text-xs font-medium text-gray-500 uppercase mb-1">
                               Contacts at {r.firmName}
                             </p>
