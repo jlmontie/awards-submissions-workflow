@@ -101,6 +101,13 @@ resource "google_secret_manager_secret_iam_member" "frontend_sheets_sa_key" {
   member    = "serviceAccount:${google_service_account.frontend.email}"
 }
 
+# Grant frontend access to the SMTP password secret
+resource "google_secret_manager_secret_iam_member" "frontend_smtp_pass" {
+  secret_id = google_secret_manager_secret.smtp_pass.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.frontend.email}"
+}
+
 # Output service account emails
 output "backend_service_account_email" {
   value       = google_service_account.backend.email

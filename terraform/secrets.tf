@@ -90,6 +90,24 @@ resource "google_secret_manager_secret_version" "sheets_sa_key_version" {
   secret_data = local.google_service_account_key
 }
 
+# Store SMTP password
+resource "google_secret_manager_secret" "smtp_pass" {
+  secret_id = "${local.name_prefix}-smtp-pass"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required_apis]
+}
+
+resource "google_secret_manager_secret_version" "smtp_pass_version" {
+  secret      = google_secret_manager_secret.smtp_pass.id
+  secret_data = var.smtp_pass
+}
+
 # Output secret paths
 output "recaptcha_secret_name" {
   value       = google_secret_manager_secret.recaptcha_secret.id

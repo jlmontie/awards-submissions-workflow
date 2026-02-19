@@ -93,3 +93,35 @@ variable "google_service_account_key_file" {
   type        = string
 }
 
+variable "smtp_host" {
+  description = "SMTP server hostname"
+  type        = string
+}
+
+variable "smtp_port" {
+  description = "SMTP server port (587 for STARTTLS, 465 for SSL)"
+  type        = string
+  default     = "587"
+}
+
+variable "smtp_user" {
+  description = "SMTP authentication username (email address)"
+  type        = string
+}
+
+variable "smtp_pass" {
+  description = "SMTP authentication password / App Password"
+  type        = string
+  sensitive   = true
+}
+
+variable "smtp_from" {
+  description = "From address shown on outbound emails, e.g. \"UC+D <mail@example.com>\""
+  type        = string
+}
+
+variable "app_url" {
+  description = "Public base URL of the app, used to build survey links in emails (no trailing slash)"
+  type        = string
+}
+
