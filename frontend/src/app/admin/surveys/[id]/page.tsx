@@ -44,6 +44,7 @@ export default function SurveyDetailPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedFirms, setExpandedFirms] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState(false);
+  const [emailResult, setEmailResult] = useState('');
 
   useEffect(() => {
     loadSurvey();
@@ -105,38 +106,29 @@ export default function SurveyDetailPage() {
     }
   }
 
-  async function handleMarkSent() {
-    if (selected.size === 0) return;
+  async function handleSendEmail(all: boolean) {
     setActionLoading(true);
+    setEmailResult('');
     setError('');
     try {
-      const res = await fetch(`/api/surveys/admin/${surveyId}/send`, {
+      const body = all
+        ? { all: true }
+        : { recipientIds: Array.from(selected) };
+      const res = await fetch(`/api/surveys/admin/${surveyId}/email`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: Array.from(selected) }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Failed to mark as sent');
-      setSelected(new Set());
-      await loadSurvey();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleMarkReminded() {
-    if (selected.size === 0) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/surveys/admin/${surveyId}/remind`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: Array.from(selected) }),
-      });
-      if (!res.ok) throw new Error('Failed to mark as reminded');
-      setSelected(new Set());
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to send emails');
+      }
+      const data = await res.json();
+      let msg = `Sent to ${data.sent} firm${data.sent !== 1 ? 's' : ''}`;
+      if (data.skipped > 0) msg += `, ${data.skipped} skipped (no contacts)`;
+      if (data.errors?.length > 0) msg += `. Errors: ${data.errors.join('; ')}`;
+      setEmailResult(msg);
+      if (!all) setSelected(new Set());
       await loadSurvey();
     } catch (err: any) {
       setError(err.message);
@@ -246,6 +238,11 @@ export default function SurveyDetailPage() {
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
+  const selectedCompleted = recipients.filter(
+    (r) => selected.has(r.recipientId) && r.status === 'completed',
+  ).length;
+  const selectedSendable = selected.size - selectedCompleted;
+
   return (
     <div className="px-4 sm:px-6 lg:px-8">
       {/* Header */}
@@ -298,6 +295,12 @@ export default function SurveyDetailPage() {
       {importResult && (
         <div className="mt-4 rounded-md bg-green-50 p-4">
           <p className="text-sm text-green-800">{importResult}</p>
+        </div>
+      )}
+
+      {emailResult && (
+        <div className="mt-4 rounded-md bg-blue-50 p-4">
+          <p className="text-sm text-blue-800">{emailResult}</p>
         </div>
       )}
 
@@ -359,22 +362,30 @@ export default function SurveyDetailPage() {
           {importing ? 'Importing...' : 'Import Recipients from Contact List'}
         </button>
 
+        {recipients.length > 0 && (
+          <button
+            onClick={() => handleSendEmail(true)}
+            disabled={actionLoading}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors disabled:opacity-50"
+          >
+            {actionLoading ? 'Sending...' : 'Email All Firms'}
+          </button>
+        )}
+
         {selected.size > 0 && (
           <>
             <button
-              onClick={handleMarkSent}
-              disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors disabled:opacity-50"
+              onClick={() => handleSendEmail(false)}
+              disabled={actionLoading || selectedSendable === 0}
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
             >
-              {actionLoading ? 'Updating...' : `Mark as Sent (${selected.size})`}
+              {actionLoading ? 'Sending...' : `Send Email (${selectedSendable})`}
             </button>
-            <button
-              onClick={handleMarkReminded}
-              disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-secondary-400 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-secondary-600 transition-colors disabled:opacity-50"
-            >
-              {actionLoading ? 'Updating...' : `Mark Reminded (${selected.size})`}
-            </button>
+            {selectedCompleted > 0 && (
+              <span className="self-center text-xs text-gray-400 italic">
+                {selectedCompleted} completed firm{selectedCompleted !== 1 ? 's' : ''} will be skipped
+              </span>
+            )}
           </>
         )}
       </div>
