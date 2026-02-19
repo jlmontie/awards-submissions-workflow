@@ -38,7 +38,6 @@ resource "google_project_service" "required_apis" {
   for_each = toset([
     "run.googleapis.com",
     "cloudfunctions.googleapis.com",
-    "cloudbuild.googleapis.com",
     "storage.googleapis.com",
     "drive.googleapis.com",
     "sheets.googleapis.com",

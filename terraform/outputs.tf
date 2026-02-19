@@ -61,14 +61,12 @@ output "dashboard_url" {
 # Next steps
 output "next_steps" {
   value = <<-EOT
-    
-    ╔════════════════════════════════════════════════════════════════╗
-    ║  🎉 Infrastructure Deployed Successfully!                      ║
-    ╚════════════════════════════════════════════════════════════════╝
-    
-    📋 Next Steps:
 
-    1. ✅ Frontend deployed automatically by Terraform!
+    Infrastructure deployed successfully.
+
+    Next steps:
+
+    1. Push to main to trigger GitHub Actions build and deploy.
 
     2. Share Google Drive/Sheets with service account:
        ${google_service_account.backend.email}
@@ -76,17 +74,15 @@ output "next_steps" {
     3. Upload blank PDF form:
        gsutil cp example-filled-submission-form.pdf gs://${google_storage_bucket.public_assets.name}/blank-submission-form.pdf
 
-    4. Access your application:
+    4. Application URL:
        ${google_cloud_run_v2_service.frontend.uri}
 
-    5. Monitor system:
-       ${google_monitoring_dashboard.main.id}
+    5. GitHub Actions secrets required:
+       GCP_WORKLOAD_IDENTITY_PROVIDER = (see workload_identity_provider output)
+       GCP_SERVICE_ACCOUNT            = (see github_actions_deploy_sa_email output)
 
-    📝 To redeploy frontend after code changes:
-       Just run 'terraform apply' again!
-    
-    📚 Documentation: See docs/ folder for detailed guides
-    
+    Documentation: See docs/ folder for detailed guides.
+
   EOT
   description = "Post-deployment instructions"
 }
