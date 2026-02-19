@@ -44,9 +44,15 @@ coverage/
 # Service account keys
 *-key.json
 service-account*.json
+credentials.json
+token.pickle
 
 # Temporary files
 tmp/
 temp/
 *.tmp
+tmp.txt
+
+# Build artifacts
+frontend/tsconfig.tsbuildinfo
 
