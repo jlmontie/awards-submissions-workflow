@@ -22,10 +22,16 @@ function buildHtml(
   surveyName: string,
   deadline: string,
   surveyUrl: string,
+  appUrl: string,
 ): string {
   const deadlineText = deadline
     ? `Please complete the survey by <strong>${deadline}</strong>.`
     : 'Please complete the survey at your earliest convenience.';
+
+  // Logo served by Next.js out of frontend/public; same image as the survey
+  // header so the email matches the survey's branding. The text alt fallback
+  // ("UC+D") shows in clients that block remote images.
+  const logoUrl = `${appUrl.replace(/\/$/, '')}/ucd-logo.png`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -43,8 +49,8 @@ function buildHtml(
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#2C3E48;padding:24px 32px;">
-              <span style="font-family:Montserrat,Arial,sans-serif;font-size:22px;font-weight:700;color:#F5CF00;letter-spacing:1px;">UC+D</span>
+            <td style="background-color:#2C3E48;padding:24px 32px;text-align:center;">
+              <img src="${logoUrl}" alt="UC+D" height="48" style="height:48px;width:auto;display:inline-block;border:0;outline:none;text-decoration:none;color:#F5CF00;font-family:Montserrat,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;" />
             </td>
           </tr>
 
@@ -53,8 +59,8 @@ function buildHtml(
             <td style="padding:32px;color:#333333;font-size:15px;line-height:1.6;">
               <p style="margin:0 0 16px 0;">Dear ${contactName},</p>
               <p style="margin:0 0 16px 0;">
-                You are receiving this message on behalf of <strong>${firmName}</strong>. We invite you to participate in the
-                <strong>${surveyName}</strong>.
+                We invite you to participate in the <strong>${surveyName}</strong>.
+                You are receiving this message as one of the contacts for <strong>${firmName}</strong>.
               </p>
               <p style="margin:0 0 24px 0;">${deadlineText}</p>
 
@@ -77,18 +83,31 @@ function buildHtml(
                 <a href="${surveyUrl}" style="color:#2C3E48;">${surveyUrl}</a>
               </p>
 
-              <p style="margin:0;font-size:13px;color:#888888;border-top:1px solid #eeeeee;padding-top:16px;">
-                This link is unique to <strong>${firmName}</strong>. Please do not share it with others.
-                If you have any questions, reply to this email.
+              <p style="margin:0 0 16px 0;">Thanks again for your consideration and support.</p>
+              <p style="margin:0 0 24px 0;">
+                If you have any questions don&rsquo;t hesitate to reach out to
+                <a href="mailto:lmarshall@utahcdmag.com" style="color:#2C3E48;">lmarshall@utahcdmag.com</a>
+              </p>
+
+              <!-- Signature -->
+              <p style="margin:0 0 4px 0;font-family:Montserrat,Arial,sans-serif;font-weight:700;color:#2C3E48;">Ladd Marshall</p>
+              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;">Utah Construction &amp; Design</p>
+              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;">
+                M: <a href="tel:+18018723531" style="color:#666666;text-decoration:none;">801-872-3531</a>
+              </p>
+              <p style="margin:0 0 4px 0;font-size:14px;">
+                <a href="mailto:lmarshall@utahcdmag.com" style="color:#2C3E48;text-decoration:none;">lmarshall@utahcdmag.com</a>
+              </p>
+              <p style="margin:0;font-size:14px;">
+                <a href="https://www.utahcdmag.com" style="color:#2C3E48;text-decoration:none;">www.utahcdmag.com</a>
               </p>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#2C3E48;padding:20px 32px;">
+            <td style="background-color:#2C3E48;padding:20px 32px;text-align:center;">
               <p style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;">UC+D Magazine</p>
-              <p style="margin:4px 0 0 0;font-size:12px;color:#aaaaaa;">Urban Land &amp; Design | Awards &amp; Rankings</p>
             </td>
           </tr>
 
@@ -114,16 +133,22 @@ function buildText(
   return [
     `Dear ${contactName},`,
     '',
-    `You are receiving this message on behalf of ${firmName}. We invite you to participate in the ${surveyName}.`,
+    `We invite you to participate in the ${surveyName}. You are receiving this message as one of the contacts for ${firmName}.`,
     '',
     deadlineText,
     '',
     'Complete your survey here:',
     surveyUrl,
     '',
-    `This link is unique to ${firmName}. Please do not share it with others.`,
+    'Thanks again for your consideration and support.',
     '',
-    'UC+D Magazine | Urban Land & Design | Awards & Rankings',
+    "If you have any questions don't hesitate to reach out to lmarshall@utahcdmag.com",
+    '',
+    'Ladd Marshall',
+    'Utah Construction & Design',
+    'M: 801-872-3531',
+    'lmarshall@utahcdmag.com',
+    'www.utahcdmag.com',
   ].join('\n');
 }
 
@@ -316,7 +341,7 @@ export async function POST(
             from: smtpFrom,
             to: contact.contactEmail,
             subject: `${surveyName} — Please Complete Your Survey`,
-            html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl),
+            html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, appUrl),
             text: buildText(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl),
           });
           console.log(

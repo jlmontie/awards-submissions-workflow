@@ -430,9 +430,14 @@ export default function SurveyForm({
       <div className="mb-6">
         <h2 className="text-xl font-bold text-gray-900">{section.title}</h2>
         {section.description && (
-          <p className="mt-1 text-sm text-gray-500">
-            {resolveLabel(section.description, surveyYear)}
-          </p>
+          // Descriptions are author-controlled (never user input) and may contain
+          // inline HTML such as anchor tags, so we render them as HTML.
+          <p
+            className="mt-1 text-sm text-gray-500"
+            dangerouslySetInnerHTML={{
+              __html: resolveLabel(section.description, surveyYear),
+            }}
+          />
         )}
       </div>
 

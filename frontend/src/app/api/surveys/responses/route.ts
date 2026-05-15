@@ -140,6 +140,10 @@ export async function POST(request: NextRequest) {
       data.pct_sports_rec || '',
       data.pct_industrial || '',
       data.pct_other || '',
+      // New column appended at the end of the schema (see RESPONSE_COLUMNS in
+      // export/route.ts and token/[token]/route.ts). Keeps existing column
+      // positions stable so historical Sheet data doesn't need to migrate.
+      data.other_segment_name || '',
     ];
 
     if (existingResponseRowIndex !== -1) {

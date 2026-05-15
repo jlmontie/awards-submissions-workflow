@@ -16,6 +16,7 @@ const RESPONSE_COLUMNS = [
   'pct_k12', 'pct_higher_ed', 'pct_civic', 'pct_healthcare',
   'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
   'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
+  'other_segment_name',
 ];
 
 const MARKET_DISPLAY_NAMES: Record<string, string> = {
