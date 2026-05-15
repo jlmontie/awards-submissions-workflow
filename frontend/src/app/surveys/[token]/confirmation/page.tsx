@@ -27,7 +27,8 @@ export default function SurveyConfirmationPage() {
             : 'Your survey response has been submitted successfully. We appreciate your participation in the annual firm rankings.'}
         </p>
         <p className="mt-4 text-sm text-gray-500">
-          Results will be published in the upcoming issue of Utah Construction &amp; Design magazine.
+          Results will be published in the upcoming issue of{' '}
+          <em>Utah Construction + Design</em>.
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3">
@@ -36,12 +37,6 @@ export default function SurveyConfirmationPage() {
             className="inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 transition-colors"
           >
             Edit Your Submission
-          </Link>
-          <Link
-            href="/"
-            className="text-sm text-charcoal-500 hover:text-secondary-400 font-medium transition-colors"
-          >
-            Return to UC&amp;D Tools
           </Link>
         </div>
       </div>

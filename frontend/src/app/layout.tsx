@@ -16,7 +16,7 @@ const montserrat = Montserrat({
 
 export const metadata: Metadata = {
   title: 'UC+D Tools',
-  description: 'Utah Construction & Design business tools platform',
+  description: 'Utah Construction + Design business tools platform',
 };
 
 export default function RootLayout({

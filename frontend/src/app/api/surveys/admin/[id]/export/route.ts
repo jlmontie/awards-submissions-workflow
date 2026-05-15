@@ -179,7 +179,7 @@ function generateExport(
   parts.push(`${surveyYear} Top Utah Architectural Firm Rankings`);
   parts.push('');
   parts.push(
-    `Utah Construction & Design is pleased to publish its ${nth} annual ` +
+    `Utah Construction + Design is pleased to publish its ${nth} annual ` +
     `list of the Top Architectural Firms in Utah, based on revenues ` +
     `generated in ${prevYear} by a firm\u2019s Utah offices. Projects ` +
     `outside of Utah that are billed to Utah-based offices are included. ` +

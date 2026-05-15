@@ -100,7 +100,7 @@ export default function SurveyPage() {
           <div className="flex items-center justify-center mb-4">
             <img
               src="/ucd-logo.png"
-              alt="Utah Construction & Design"
+              alt="Utah Construction + Design"
               className="h-12 w-auto"
             />
           </div>

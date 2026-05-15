@@ -113,7 +113,7 @@ function buildHtml(
 
               <!-- Signature -->
               <p style="margin:0 0 4px 0;font-family:Montserrat,Arial,sans-serif;font-weight:700;color:#2C3E48;">Ladd Marshall</p>
-              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;">Utah Construction &amp; Design</p>
+              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;font-style:italic;">Utah Construction + Design</p>
               <p style="margin:0 0 4px 0;color:#666666;font-size:14px;">
                 M: <a href="tel:+18018723531" style="color:#666666;text-decoration:none;">801-872-3531</a>
               </p>
@@ -129,7 +129,7 @@ function buildHtml(
           <!-- Footer -->
           <tr>
             <td class="ucd-bg-navy" style="background-color:#2C3E48;padding:20px 32px;text-align:center;">
-              <p class="ucd-text-yellow" style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;">UC+D Magazine</p>
+              <p class="ucd-text-yellow" style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;font-style:italic;">Utah Construction + Design</p>
             </td>
           </tr>
 
@@ -167,7 +167,7 @@ function buildText(
     "If you have any questions don't hesitate to reach out to lmarshall@utahcdmag.com",
     '',
     'Ladd Marshall',
-    'Utah Construction & Design',
+    'Utah Construction + Design',
     'M: 801-872-3531',
     'lmarshall@utahcdmag.com',
     'www.utahcdmag.com',

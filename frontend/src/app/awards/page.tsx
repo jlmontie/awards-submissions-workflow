@@ -17,7 +17,7 @@ export default function AwardsPage() {
           <div className="flex flex-col items-center mb-6">
             <img
               src="/ucd-logo.png"
-              alt="Utah Construction & Design Magazine"
+              alt="Utah Construction + Design"
               className="h-20 w-auto mb-4"
             />
           </div>
