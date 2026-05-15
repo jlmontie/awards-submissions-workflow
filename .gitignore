@@ -56,3 +56,17 @@ tmp.txt
 # Build artifacts
 frontend/tsconfig.tsbuildinfo
 
+# macOS Finder duplicates (e.g. "file copy.rtf", "file copy 2.csv")
+* copy
+* copy.*
+* copy [0-9]
+* copy [0-9].*
+
+# macOS / generic screenshots accidentally dropped into the repo.
+# Move screenshots you actually want tracked into a dedicated assets folder
+# and rename them before adding.
+Screen Shot*.png
+Screen Shot*.jpg
+Screenshot*.png
+Screenshot*.jpg
+
