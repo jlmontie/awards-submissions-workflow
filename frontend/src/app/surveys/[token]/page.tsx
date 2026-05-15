@@ -18,6 +18,8 @@ interface SurveyInfo {
     firmName: string;
     draftData: Record<string, string | boolean> | null;
     draftSavedAt: string | null;
+    isCompleted: boolean;
+    collaborators: { name: string; email: string }[];
   };
 }
 
@@ -38,8 +40,6 @@ export default function SurveyPage() {
           const data = await res.json().catch(() => ({}));
           if (res.status === 410) {
             setError('This survey has been closed. Thank you for your interest.');
-          } else if (res.status === 409) {
-            setError('You have already submitted a response to this survey. Thank you!');
           } else {
             setError(data.error || 'Survey not found. Please check your link.');
           }
@@ -129,7 +129,11 @@ export default function SurveyPage() {
           initialFirmName={surveyInfo.recipient.firmName}
           initialDraftData={surveyInfo.recipient.draftData}
           initialDraftSavedAt={surveyInfo.recipient.draftSavedAt}
-          onSuccess={() => router.push(`/surveys/${token}/confirmation`)}
+          isCompleted={surveyInfo.recipient.isCompleted}
+          collaborators={surveyInfo.recipient.collaborators}
+          onSuccess={(edited) =>
+            router.push(`/surveys/${token}/confirmation${edited ? '?edited=1' : ''}`)
+          }
         />
       </div>
     </main>

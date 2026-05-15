@@ -203,7 +203,7 @@ export async function POST(
     const surveyCategory = surveyRow[sCategoryCol] || '';
     const surveyDeadline = surveyRow[sDeadlineCol] || '';
 
-    // --- Contacts lookup (keyed by normalized firm name: trimmed lowercase) ---
+    // --- Contacts lookup ---
     const contactRows = contactsRes.data.values || [];
     const contactsByFirm: Record<string, { contactName: string; contactEmail: string }[]> = {};
 
@@ -220,10 +220,9 @@ export async function POST(
         const category = (row[cCategoryCol] || '').trim().toLowerCase();
         const active = (row[cActiveCol] || '').trim().toUpperCase();
         const firmName = (row[cFirmCol] || '').trim();
-        const firmKey = firmName.toLowerCase();
         if (category === surveyCategory && active === 'TRUE' && firmName) {
-          if (!contactsByFirm[firmKey]) contactsByFirm[firmKey] = [];
-          contactsByFirm[firmKey].push({
+          if (!contactsByFirm[firmName]) contactsByFirm[firmName] = [];
+          contactsByFirm[firmName].push({
             contactName: row[cNameCol] || '',
             contactEmail: row[cEmailCol] || '',
           });
@@ -266,7 +265,7 @@ export async function POST(
         recipientId: row[rIdCol] || '',
         firmName: row[rFirmCol] || '',
         token: row[rTokenCol] || '',
-        currentStatus: row[rStatusCol] || 'pending',
+        currentStatus: row[rStatusCol] || '',
       });
     }
 
@@ -278,15 +277,31 @@ export async function POST(
       auth: { user: smtpUser, pass: smtpPass },
     });
 
+    console.log(
+      `[email] SMTP transport: host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${smtpFrom} targets=${targets.length}`,
+    );
+
+    try {
+      await transporter.verify();
+      console.log('[email] SMTP transporter verified');
+    } catch (err: any) {
+      console.error('[email] SMTP verify failed:', err?.message, err?.code, err?.response);
+      return NextResponse.json(
+        { error: `SMTP connection/auth failed: ${err?.message}` },
+        { status: 502 },
+      );
+    }
+
     let sent = 0;
+    let reminded = 0;
     let skipped = 0;
     const errors: string[] = [];
     const now = new Date().toISOString();
 
     for (const target of targets) {
-      const firmKey = target.firmName.trim().toLowerCase();
-      const contacts = contactsByFirm[firmKey] || [];
+      const contacts = contactsByFirm[target.firmName] || [];
       if (contacts.length === 0) {
+        console.warn(`[email] No contacts for firm "${target.firmName}" — skipping`);
         skipped++;
         continue;
       }
@@ -297,63 +312,73 @@ export async function POST(
       for (const contact of contacts) {
         if (!contact.contactEmail) continue;
         try {
-          await transporter.sendMail({
+          const info = await transporter.sendMail({
             from: smtpFrom,
             to: contact.contactEmail,
             subject: `${surveyName} — Please Complete Your Survey`,
             html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl),
             text: buildText(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl),
           });
+          console.log(
+            `[email] Sent to ${contact.contactEmail} (firm=${target.firmName}) messageId=${info.messageId} response=${info.response}`,
+          );
           recipientSentOk = true;
         } catch (err: any) {
+          console.error(
+            `[email] Send failed for ${contact.contactEmail} (firm=${target.firmName}):`,
+            err?.message,
+            err?.code,
+            err?.response,
+          );
           errors.push(`${target.firmName} / ${contact.contactEmail}: ${err.message}`);
         }
       }
 
       if (recipientSentOk) {
-        // First send → status='sent' + sent_at; repeat send → status='reminded' + reminded_at
-        const isReminder = target.currentStatus === 'sent' || target.currentStatus === 'reminded';
-        const updates: Promise<any>[] = [];
+        // If the recipient was already sent/reminded, treat this send as a reminder:
+        // update status to 'reminded' and reminded_at, leaving sent_at untouched.
+        // Otherwise (first send), set status to 'sent' and sent_at.
+        const isReminder =
+          target.currentStatus === 'sent' || target.currentStatus === 'reminded';
+        const newStatus = isReminder ? 'reminded' : 'sent';
+        const timestampCol = isReminder ? rRemindedAtCol : rSentAtCol;
 
+        const updates: Promise<any>[] = [];
         if (rStatusCol !== -1) {
           updates.push(
             sheets.spreadsheets.values.update({
               spreadsheetId,
               range: `Survey Recipients!${columnLetter(rStatusCol)}${target.sheetRowIndex}`,
               valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [[isReminder ? 'reminded' : 'sent']] },
+              requestBody: { values: [[newStatus]] },
             }),
           );
         }
-
-        if (isReminder && rRemindedAtCol !== -1) {
+        if (timestampCol !== -1) {
           updates.push(
             sheets.spreadsheets.values.update({
               spreadsheetId,
-              range: `Survey Recipients!${columnLetter(rRemindedAtCol)}${target.sheetRowIndex}`,
-              valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [[now]] },
-            }),
-          );
-        } else if (!isReminder && rSentAtCol !== -1) {
-          updates.push(
-            sheets.spreadsheets.values.update({
-              spreadsheetId,
-              range: `Survey Recipients!${columnLetter(rSentAtCol)}${target.sheetRowIndex}`,
+              range: `Survey Recipients!${columnLetter(timestampCol)}${target.sheetRowIndex}`,
               valueInputOption: 'USER_ENTERED',
               requestBody: { values: [[now]] },
             }),
           );
         }
-
         await Promise.all(updates);
-        sent++;
+        console.log(
+          `[email] Marked firm "${target.firmName}" as ${newStatus} (prior status="${target.currentStatus}")`,
+        );
+        if (isReminder) reminded++;
+        else sent++;
       } else {
         skipped++;
       }
     }
 
-    return NextResponse.json({ sent, skipped, errors });
+    console.log(
+      `[email] Done: sent=${sent} reminded=${reminded} skipped=${skipped} errors=${errors.length}`,
+    );
+    return NextResponse.json({ sent, reminded, skipped, errors });
   } catch (error: any) {
     console.error('Error sending survey emails:', error);
     return NextResponse.json(

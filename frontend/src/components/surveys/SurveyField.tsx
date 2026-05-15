@@ -29,7 +29,8 @@ export default function SurveyField({ field, value, error, onChange, disabled }:
     );
   }
 
-  const inputType = field.type === 'currency' || field.type === 'percent' ? 'text' : field.type;
+  const inputType =
+    field.type === 'currency' ? 'text' : field.type === 'percent' ? 'number' : field.type;
 
   return (
     <div>
@@ -48,6 +49,9 @@ export default function SurveyField({ field, value, error, onChange, disabled }:
           onChange={(e) => onChange(field.key, e.target.value)}
           disabled={disabled}
           placeholder={field.placeholder}
+          {...(field.type === 'percent'
+            ? { step: 1, min: 0, max: 100, inputMode: 'numeric' as const }
+            : {})}
           className={`
             block w-full rounded-md border shadow-sm sm:text-sm px-3 py-2
             ${field.type === 'currency' ? 'pl-7' : ''}

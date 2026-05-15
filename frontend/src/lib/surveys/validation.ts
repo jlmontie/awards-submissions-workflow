@@ -62,13 +62,15 @@ export function validateSurvey(
             const num = Number(strValue.replace(/%/g, ''));
             if (isNaN(num) || num < 0 || num > 100) {
               errors[field.key] = 'Enter a value between 0 and 100';
+            } else if (!Number.isInteger(num)) {
+              errors[field.key] = 'Enter a whole number (no decimals)';
             }
           }
           break;
       }
     }
 
-    // Percentage group sum check
+    // Percentage group sum check — must total exactly 100%
     if (section.type === 'percentage_group') {
       const sum = section.fields.reduce((acc, field) => {
         const val = data[field.key];
@@ -77,8 +79,8 @@ export function validateSurvey(
         return acc + (isNaN(num) ? 0 : num);
       }, 0);
 
-      if (sum > 0 && Math.abs(sum - 100) > 0.5) {
-        errors['_percentage_group'] = `Market segments total ${sum}%. They should add up to 100%.`;
+      if (sum > 0 && sum !== 100) {
+        errors['_percentage_group'] = `Market segments total ${sum}%. They must add up to exactly 100%.`;
       }
     }
   }

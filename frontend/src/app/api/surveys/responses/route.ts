@@ -62,28 +62,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid survey link' }, { status: 404 });
     }
 
-    // Check for duplicate submission
-    if (recipientRow[statusCol] === 'completed') {
-      return NextResponse.json(
-        { error: 'You have already submitted a response.' },
-        { status: 409 },
-      );
-    }
+    const isEditingExisting = recipientRow[statusCol] === 'completed';
 
     const surveyId = recipientRow[surveyIdCol];
     const recipientId = recipientRow[recipientIdCol];
     const now = new Date().toISOString();
 
-    // 2. Generate response ID
-    // Count existing responses to generate sequential ID
+    // Look up existing response for this recipient (if any) so we can overwrite in place.
     const responsesRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Survey Responses!A:A',
+      range: 'Survey Responses!A:Z',
     });
-    const existingResponses = (responsesRes.data.values || []).length;
-    const responseId = `SR-${new Date().getFullYear()}-${String(existingResponses).padStart(3, '0')}`;
+    const responseRows = responsesRes.data.values || [];
+    let existingResponseRowIndex = -1;
+    let existingResponseId = '';
 
-    // 3. Write response row
+    if (responseRows.length >= 2) {
+      const respHeaders = responseRows[0];
+      const respRecipientCol = respHeaders.indexOf('recipient_id');
+      const respIdCol = respHeaders.indexOf('response_id');
+      if (respRecipientCol !== -1) {
+        for (let i = 1; i < responseRows.length; i++) {
+          if (responseRows[i][respRecipientCol] === recipientId) {
+            existingResponseRowIndex = i + 1; // 1-indexed
+            existingResponseId = respIdCol !== -1 ? responseRows[i][respIdCol] || '' : '';
+            break;
+          }
+        }
+      }
+    }
+
+    // Generate / reuse response ID
+    const responseId =
+      existingResponseId ||
+      `SR-${new Date().getFullYear()}-${String(responseRows.length).padStart(3, '0')}`;
+
+    // 3. Build response row
     // Column order matches the plan's response sheet structure
     const responseRow = [
       responseId,
@@ -127,16 +141,25 @@ export async function POST(request: NextRequest) {
       data.pct_other || '',
     ];
 
-    await sheets.spreadsheets.values.append({
-      spreadsheetId,
-      range: 'Survey Responses!A:Z',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: {
-        values: [responseRow],
-      },
-    });
+    if (existingResponseRowIndex !== -1) {
+      // Editing an existing submission: overwrite the row in place.
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: `Survey Responses!A${existingResponseRowIndex}:${columnLetter(responseRow.length - 1)}${existingResponseRowIndex}`,
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [responseRow] },
+      });
+    } else {
+      // First submission: append a new row.
+      await sheets.spreadsheets.values.append({
+        spreadsheetId,
+        range: 'Survey Responses!A:Z',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: [responseRow] },
+      });
+    }
 
-    // 4. Update recipient status to "completed"
+    // 4. Update recipient status to "completed" (and completed_at on first submit)
     if (statusCol !== -1) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
@@ -147,21 +170,23 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Also update completed_at if column exists
-      const completedAtCol = recipientHeaders.indexOf('completed_at');
-      if (completedAtCol !== -1) {
-        await sheets.spreadsheets.values.update({
-          spreadsheetId,
-          range: `Survey Recipients!${columnLetter(completedAtCol)}${recipientRowIndex}`,
-          valueInputOption: 'USER_ENTERED',
-          requestBody: {
-            values: [[now]],
-          },
-        });
+      // Only stamp completed_at on the FIRST submission — preserve original timestamp on edits.
+      if (!isEditingExisting) {
+        const completedAtCol = recipientHeaders.indexOf('completed_at');
+        if (completedAtCol !== -1) {
+          await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range: `Survey Recipients!${columnLetter(completedAtCol)}${recipientRowIndex}`,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+              values: [[now]],
+            },
+          });
+        }
       }
     }
 
-    return NextResponse.json({ responseId });
+    return NextResponse.json({ responseId, edited: isEditingExisting });
   } catch (error: any) {
     console.error('Error submitting survey response:', error);
     return NextResponse.json(

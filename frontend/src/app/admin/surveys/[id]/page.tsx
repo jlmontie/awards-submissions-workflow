@@ -106,6 +106,26 @@ export default function SurveyDetailPage() {
     }
   }
 
+  async function handleMarkSent() {
+    if (selected.size === 0) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/surveys/admin/${surveyId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientIds: Array.from(selected) }),
+      });
+      if (!res.ok) throw new Error('Failed to mark as sent');
+      setSelected(new Set());
+      await loadSurvey();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleSendEmail(all: boolean) {
     setActionLoading(true);
     setEmailResult('');
@@ -124,11 +144,35 @@ export default function SurveyDetailPage() {
         throw new Error(data.error || 'Failed to send emails');
       }
       const data = await res.json();
-      let msg = `Sent to ${data.sent} firm${data.sent !== 1 ? 's' : ''}`;
+      const parts: string[] = [];
+      if (data.sent > 0) parts.push(`sent to ${data.sent} firm${data.sent !== 1 ? 's' : ''}`);
+      if (data.reminded > 0) parts.push(`reminded ${data.reminded} firm${data.reminded !== 1 ? 's' : ''}`);
+      let msg = parts.length > 0 ? parts.join(', ') : 'No emails sent';
+      msg = msg.charAt(0).toUpperCase() + msg.slice(1);
       if (data.skipped > 0) msg += `, ${data.skipped} skipped (no contacts)`;
       if (data.errors?.length > 0) msg += `. Errors: ${data.errors.join('; ')}`;
       setEmailResult(msg);
       if (!all) setSelected(new Set());
+      await loadSurvey();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function handleMarkReminded() {
+    if (selected.size === 0) return;
+    setActionLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/surveys/admin/${surveyId}/remind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientIds: Array.from(selected) }),
+      });
+      if (!res.ok) throw new Error('Failed to mark as reminded');
+      setSelected(new Set());
       await loadSurvey();
     } catch (err: any) {
       setError(err.message);
@@ -237,11 +281,6 @@ export default function SurveyDetailPage() {
     : null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-
-  const selectedCompleted = recipients.filter(
-    (r) => selected.has(r.recipientId) && r.status === 'completed',
-  ).length;
-  const selectedSendable = selected.size - selectedCompleted;
 
   return (
     <div className="px-4 sm:px-6 lg:px-8">
@@ -376,16 +415,25 @@ export default function SurveyDetailPage() {
           <>
             <button
               onClick={() => handleSendEmail(false)}
-              disabled={actionLoading || selectedSendable === 0}
+              disabled={actionLoading}
               className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
             >
-              {actionLoading ? 'Sending...' : `Send Email (${selectedSendable})`}
+              {actionLoading ? 'Sending...' : `Send Email (${selected.size})`}
             </button>
-            {selectedCompleted > 0 && (
-              <span className="self-center text-xs text-gray-400 italic">
-                {selectedCompleted} completed firm{selectedCompleted !== 1 ? 's' : ''} will be skipped
-              </span>
-            )}
+            <button
+              onClick={handleMarkSent}
+              disabled={actionLoading}
+              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              {actionLoading ? 'Updating...' : `Mark as Sent (${selected.size})`}
+            </button>
+            <button
+              onClick={handleMarkReminded}
+              disabled={actionLoading}
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-secondary-400 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-secondary-600 transition-colors disabled:opacity-50"
+            >
+              {actionLoading ? 'Updating...' : `Mark Reminded (${selected.size})`}
+            </button>
           </>
         )}
       </div>
