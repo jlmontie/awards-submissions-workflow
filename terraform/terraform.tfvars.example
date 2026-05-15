@@ -40,12 +40,14 @@ lifecycle_delete_days = 365  # Delete old submissions after 1 year
 max_pdf_size_mb   = 50
 max_photo_size_mb = 20
 
-# SMTP — for Gmail use an App Password (myaccount.google.com → Security → App Passwords)
-# For Bluehost/Hostmonster: smtp_host = "mail.yourdomain.com", smtp_port = "587"
-smtp_host = "smtp.gmail.com"
-smtp_port = "587"
-smtp_user = "sender@example.com"
-smtp_pass = "xxxx-xxxx-xxxx-xxxx"
-smtp_from = "UC+D <sender@example.com>"
-app_url   = "https://awards.utahcdmag.com"
+# SMTP / Email Configuration
+# The SMTP password must be stored in Secret Manager under the name `email-password`.
+# Create it manually with:
+#   gcloud secrets create email-password --replication-policy=automatic
+#   echo -n "your-password" | gcloud secrets versions add email-password --data-file=-
+smtp_host = "host400.hostmonster.com"
+smtp_port = 465                           # 465 for SSL, 587 for STARTTLS
+smtp_user = "you@yourcompany.com"
+smtp_from = "you@yourcompany.com"         # Optional; defaults to smtp_user
+app_url   = "https://awards.yourcompany.com"
 

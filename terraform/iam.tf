@@ -101,9 +101,18 @@ resource "google_secret_manager_secret_iam_member" "frontend_sheets_sa_key" {
   member    = "serviceAccount:${google_service_account.frontend.email}"
 }
 
-# Grant frontend access to the SMTP password secret
-resource "google_secret_manager_secret_iam_member" "frontend_smtp_pass" {
-  secret_id = google_secret_manager_secret.smtp_pass.secret_id
+# Grant frontend access to the SMTP password secret (managed outside Terraform).
+# Kept for fallback/rollback even after switching to Resend.
+resource "google_secret_manager_secret_iam_member" "frontend_email_password" {
+  secret_id = data.google_secret_manager_secret.email_password.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.frontend.email}"
+}
+
+# Grant frontend access to the Resend API key secret (managed outside Terraform).
+# This is the current SMTP_PASS for outgoing transactional mail via smtp.resend.com.
+resource "google_secret_manager_secret_iam_member" "frontend_resend_api_key" {
+  secret_id = data.google_secret_manager_secret.resend_api_key.secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.frontend.email}"
 }

@@ -75,11 +75,7 @@ resource "google_cloud_run_v2_service" "frontend" {
         }
       }
 
-      env {
-        name  = "NODE_ENV"
-        value = "production"
-      }
-
+      # SMTP configuration for sending survey invitation emails
       env {
         name  = "SMTP_HOST"
         value = var.smtp_host
@@ -87,7 +83,7 @@ resource "google_cloud_run_v2_service" "frontend" {
 
       env {
         name  = "SMTP_PORT"
-        value = var.smtp_port
+        value = tostring(var.smtp_port)
       }
 
       env {
@@ -96,23 +92,30 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name  = "SMTP_FROM"
+        value = var.smtp_from != "" ? var.smtp_from : var.smtp_user
+      }
+
+      # SMTP_PASS reads from the Resend API key secret.
+      # (Switched from email-password / Hostmonster SMTP — Hostmonster blocked Cloud Run's IP range.)
+      env {
         name = "SMTP_PASS"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.smtp_pass.secret_id
+            secret  = data.google_secret_manager_secret.resend_api_key.secret_id
             version = "latest"
           }
         }
       }
 
       env {
-        name  = "SMTP_FROM"
-        value = var.smtp_from
+        name  = "APP_URL"
+        value = var.app_url
       }
 
       env {
-        name  = "APP_URL"
-        value = var.app_url
+        name  = "NODE_ENV"
+        value = "production"
       }
     }
 
@@ -151,5 +154,31 @@ resource "google_cloud_run_service_iam_member" "frontend_public" {
 output "frontend_url" {
   value       = google_cloud_run_v2_service.frontend.uri
   description = "URL of the frontend Cloud Run service"
+}
+
+# Custom domain mapping (only created when var.domain is set)
+resource "google_cloud_run_domain_mapping" "frontend" {
+  count    = var.domain != "" ? 1 : 0
+  name     = var.domain
+  location = var.region
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.frontend.name
+  }
+}
+
+# DNS records to add at your DNS provider for the custom domain.
+# For a subdomain like `awards.utahcdmag.com`, this will typically be a single
+# CNAME pointing to `ghs.googlehosted.com`.
+output "custom_domain_dns_records" {
+  value = var.domain != "" ? [
+    for r in google_cloud_run_domain_mapping.frontend[0].status[0].resource_records :
+    "${r.type} ${r.name != null ? r.name : var.domain} -> ${r.rrdata}"
+  ] : []
+  description = "DNS records to add at your DNS provider for the custom domain"
 }
 

@@ -93,35 +93,33 @@ variable "google_service_account_key_file" {
   type        = string
 }
 
+# SMTP / Email configuration
 variable "smtp_host" {
-  description = "SMTP server hostname"
+  description = "SMTP server hostname for outgoing mail"
   type        = string
+  default     = "host400.hostmonster.com"
 }
 
 variable "smtp_port" {
-  description = "SMTP server port (587 for STARTTLS, 465 for SSL)"
-  type        = string
-  default     = "587"
+  description = "SMTP server port (465 for SSL, 587 for STARTTLS)"
+  type        = number
+  default     = 465
 }
 
 variable "smtp_user" {
-  description = "SMTP authentication username (email address)"
+  description = "SMTP username (full email address)"
   type        = string
-}
-
-variable "smtp_pass" {
-  description = "SMTP authentication password / App Password"
-  type        = string
-  sensitive   = true
 }
 
 variable "smtp_from" {
-  description = "From address shown on outbound emails, e.g. \"UC+D <mail@example.com>\""
+  description = "From address for outgoing mail (defaults to smtp_user if empty)"
   type        = string
+  default     = ""
 }
 
 variable "app_url" {
-  description = "Public base URL of the app, used to build survey links in emails (no trailing slash)"
+  description = "Public base URL of the application (used in email links). Falls back to the Cloud Run URL if empty."
   type        = string
+  default     = ""
 }
 

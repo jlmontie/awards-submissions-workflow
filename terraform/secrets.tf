@@ -90,22 +90,23 @@ resource "google_secret_manager_secret_version" "sheets_sa_key_version" {
   secret_data = local.google_service_account_key
 }
 
-# Store SMTP password
-resource "google_secret_manager_secret" "smtp_pass" {
-  secret_id = "${local.name_prefix}-smtp-pass"
-
-  labels = local.common_labels
-
-  replication {
-    auto {}
-  }
+# Reference the externally-managed email password secret.
+# This secret is created/rotated manually (not by Terraform) and holds the SMTP password.
+data "google_secret_manager_secret" "email_password" {
+  secret_id = "email-password"
 
   depends_on = [google_project_service.required_apis]
 }
 
-resource "google_secret_manager_secret_version" "smtp_pass_version" {
-  secret      = google_secret_manager_secret.smtp_pass.id
-  secret_data = var.smtp_pass
+# Reference the Resend API key secret (created manually outside Terraform).
+# Used as the SMTP password for Resend's SMTP gateway (smtp.resend.com).
+# Create with:
+#   gcloud secrets create resend-api-key --replication-policy=automatic --project=uc-and-d
+#   echo -n "re_..." | gcloud secrets versions add resend-api-key --data-file=- --project=uc-and-d
+data "google_secret_manager_secret" "resend_api_key" {
+  secret_id = "resend-api-key"
+
+  depends_on = [google_project_service.required_apis]
 }
 
 # Output secret paths
