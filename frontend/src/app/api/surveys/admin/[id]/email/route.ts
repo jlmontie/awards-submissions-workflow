@@ -38,8 +38,30 @@ function buildHtml(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light only" />
+  <meta name="supported-color-schemes" content="light only" />
   <title>${surveyName}</title>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* Tell clients we're a light-only design. Apple Mail/Outlook respect this. */
+    :root {
+      color-scheme: light only;
+      supported-color-schemes: light only;
+    }
+    /* Belt-and-suspenders: if a client still applies a dark-mode pass, force
+       the brand navy + yellow back onto the bands they live on. Without this
+       the navy footer turns near-white while the yellow text stays yellow,
+       which becomes illegible. */
+    @media (prefers-color-scheme: dark) {
+      .ucd-bg-navy { background-color: #2C3E48 !important; }
+      .ucd-text-yellow { color: #F5CF00 !important; }
+    }
+    /* Outlook 365 dark-mode attribute selectors (separate from prefers-color-scheme). */
+    [data-ogsc] .ucd-bg-navy,
+    [data-ogsb] .ucd-bg-navy { background-color: #2C3E48 !important; }
+    [data-ogsc] .ucd-text-yellow,
+    [data-ogsb] .ucd-text-yellow { color: #F5CF00 !important; }
+  </style>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Roboto,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:32px 0;">
@@ -49,8 +71,8 @@ function buildHtml(
 
           <!-- Header -->
           <tr>
-            <td style="background-color:#2C3E48;padding:24px 32px;text-align:center;">
-              <img src="${logoUrl}" alt="UC+D" height="48" style="height:48px;width:auto;display:inline-block;border:0;outline:none;text-decoration:none;color:#F5CF00;font-family:Montserrat,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;" />
+            <td class="ucd-bg-navy" style="background-color:#2C3E48;padding:24px 32px;text-align:center;">
+              <img src="${logoUrl}" alt="UC+D" height="48" class="ucd-text-yellow" style="height:48px;width:auto;display:inline-block;border:0;outline:none;text-decoration:none;color:#F5CF00;font-family:Montserrat,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;" />
             </td>
           </tr>
 
@@ -106,8 +128,8 @@ function buildHtml(
 
           <!-- Footer -->
           <tr>
-            <td style="background-color:#2C3E48;padding:20px 32px;text-align:center;">
-              <p style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;">UC+D Magazine</p>
+            <td class="ucd-bg-navy" style="background-color:#2C3E48;padding:20px 32px;text-align:center;">
+              <p class="ucd-text-yellow" style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;">UC+D Magazine</p>
             </td>
           </tr>
 
