@@ -106,26 +106,6 @@ export default function SurveyDetailPage() {
     }
   }
 
-  async function handleMarkSent() {
-    if (selected.size === 0) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/surveys/admin/${surveyId}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: Array.from(selected) }),
-      });
-      if (!res.ok) throw new Error('Failed to mark as sent');
-      setSelected(new Set());
-      await loadSurvey();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
   async function handleSendEmail(all: boolean) {
     setActionLoading(true);
     setEmailResult('');
@@ -153,26 +133,6 @@ export default function SurveyDetailPage() {
       if (data.errors?.length > 0) msg += `. Errors: ${data.errors.join('; ')}`;
       setEmailResult(msg);
       if (!all) setSelected(new Set());
-      await loadSurvey();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  }
-
-  async function handleMarkReminded() {
-    if (selected.size === 0) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`/api/surveys/admin/${surveyId}/remind`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipientIds: Array.from(selected) }),
-      });
-      if (!res.ok) throw new Error('Failed to mark as reminded');
-      setSelected(new Set());
       await loadSurvey();
     } catch (err: any) {
       setError(err.message);
@@ -412,29 +372,13 @@ export default function SurveyDetailPage() {
         )}
 
         {selected.size > 0 && (
-          <>
-            <button
-              onClick={() => handleSendEmail(false)}
-              disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
-            >
-              {actionLoading ? 'Sending...' : `Send Email (${selected.size})`}
-            </button>
-            <button
-              onClick={handleMarkSent}
-              disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              {actionLoading ? 'Updating...' : `Mark as Sent (${selected.size})`}
-            </button>
-            <button
-              onClick={handleMarkReminded}
-              disabled={actionLoading}
-              className="inline-flex items-center justify-center rounded-md border border-transparent bg-secondary-400 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-secondary-600 transition-colors disabled:opacity-50"
-            >
-              {actionLoading ? 'Updating...' : `Mark Reminded (${selected.size})`}
-            </button>
-          </>
+          <button
+            onClick={() => handleSendEmail(false)}
+            disabled={actionLoading}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
+          >
+            {actionLoading ? 'Sending...' : `Send Email (${selected.size})`}
+          </button>
         )}
       </div>
 
