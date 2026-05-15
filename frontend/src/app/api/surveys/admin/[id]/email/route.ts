@@ -16,6 +16,19 @@ function columnLetter(index: number): string {
   return letter;
 }
 
+function buildSubject(
+  surveyName: string,
+  deadline: string,
+  isReminder: boolean,
+): string {
+  if (isReminder) {
+    return deadline
+      ? `Reminder: ${surveyName} — Survey Closes ${deadline}`
+      : `Reminder: ${surveyName} — Please Complete Your Survey`;
+  }
+  return `${surveyName} — Please Complete Your Survey`;
+}
+
 function buildHtml(
   contactName: string,
   firmName: string,
@@ -23,10 +36,28 @@ function buildHtml(
   deadline: string,
   surveyUrl: string,
   appUrl: string,
+  isReminder: boolean,
 ): string {
-  const deadlineText = deadline
-    ? `Please complete the survey by <strong>${deadline}</strong>.`
-    : 'Please complete the survey at your earliest convenience.';
+  let deadlineText: string;
+  if (!deadline) {
+    deadlineText = 'Please complete the survey at your earliest convenience.';
+  } else if (isReminder) {
+    deadlineText = `The survey closes on <strong>${deadline}</strong> — please submit your response before then.`;
+  } else {
+    deadlineText = `Please complete the survey by <strong>${deadline}</strong>.`;
+  }
+
+  const greeting = isReminder ? `Hi ${contactName},` : `Dear ${contactName},`;
+
+  const introHtml = isReminder
+    ? `This is a quick reminder that we haven&rsquo;t yet received your response to the <strong>${surveyName}</strong>.
+                Your input on behalf of <strong>${firmName}</strong> is important to us &mdash; completing the survey only takes a few minutes.`
+    : `We invite you to participate in the <strong>${surveyName}</strong>.
+                You are receiving this message as one of the contacts for <strong>${firmName}</strong>.`;
+
+  const closingHtml = isReminder
+    ? 'Thanks for taking the time to respond.'
+    : 'Thanks again for your consideration and support.';
 
   // Logo served by Next.js out of frontend/public; same image as the survey
   // header so the email matches the survey's branding. The text alt fallback
@@ -79,10 +110,9 @@ function buildHtml(
           <!-- Body -->
           <tr>
             <td style="padding:32px;color:#333333;font-size:15px;line-height:1.6;">
-              <p style="margin:0 0 16px 0;">Dear ${contactName},</p>
+              <p style="margin:0 0 16px 0;">${greeting}</p>
               <p style="margin:0 0 16px 0;">
-                We invite you to participate in the <strong>${surveyName}</strong>.
-                You are receiving this message as one of the contacts for <strong>${firmName}</strong>.
+                ${introHtml}
               </p>
               <p style="margin:0 0 24px 0;">${deadlineText}</p>
 
@@ -105,10 +135,9 @@ function buildHtml(
                 <a href="${surveyUrl}" style="color:#2C3E48;">${surveyUrl}</a>
               </p>
 
-              <p style="margin:0 0 16px 0;">Thanks again for your consideration and support.</p>
+              <p style="margin:0 0 16px 0;">${closingHtml}</p>
               <p style="margin:0 0 24px 0;">
-                If you have any questions don&rsquo;t hesitate to reach out to
-                <a href="mailto:lmarshall@utahcdmag.com" style="color:#2C3E48;">lmarshall@utahcdmag.com</a>
+                If you have any questions don&rsquo;t hesitate to reach out to me.
               </p>
 
               <!-- Signature -->
@@ -147,24 +176,40 @@ function buildText(
   surveyName: string,
   deadline: string,
   surveyUrl: string,
+  isReminder: boolean,
 ): string {
-  const deadlineText = deadline
-    ? `Please complete the survey by ${deadline}.`
-    : 'Please complete the survey at your earliest convenience.';
+  let deadlineText: string;
+  if (!deadline) {
+    deadlineText = 'Please complete the survey at your earliest convenience.';
+  } else if (isReminder) {
+    deadlineText = `The survey closes on ${deadline} — please submit your response before then.`;
+  } else {
+    deadlineText = `Please complete the survey by ${deadline}.`;
+  }
+
+  const greeting = isReminder ? `Hi ${contactName},` : `Dear ${contactName},`;
+
+  const intro = isReminder
+    ? `This is a quick reminder that we haven't yet received your response to the ${surveyName}. Your input on behalf of ${firmName} is important to us — completing the survey only takes a few minutes.`
+    : `We invite you to participate in the ${surveyName}. You are receiving this message as one of the contacts for ${firmName}.`;
+
+  const closing = isReminder
+    ? 'Thanks for taking the time to respond.'
+    : 'Thanks again for your consideration and support.';
 
   return [
-    `Dear ${contactName},`,
+    greeting,
     '',
-    `We invite you to participate in the ${surveyName}. You are receiving this message as one of the contacts for ${firmName}.`,
+    intro,
     '',
     deadlineText,
     '',
     'Complete your survey here:',
     surveyUrl,
     '',
-    'Thanks again for your consideration and support.',
+    closing,
     '',
-    "If you have any questions don't hesitate to reach out to lmarshall@utahcdmag.com",
+    "If you have any questions don't hesitate to reach out to me.",
     '',
     'Ladd Marshall',
     'Utah Construction + Design',
@@ -354,6 +399,8 @@ export async function POST(
       }
 
       const surveyUrl = `${appUrl}/surveys/${target.token}`;
+      const isReminder =
+        target.currentStatus === 'sent' || target.currentStatus === 'reminded';
       let recipientSentOk = false;
 
       for (const contact of contacts) {
@@ -362,9 +409,9 @@ export async function POST(
           const info = await transporter.sendMail({
             from: smtpFrom,
             to: contact.contactEmail,
-            subject: `${surveyName} — Please Complete Your Survey`,
-            html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, appUrl),
-            text: buildText(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl),
+            subject: buildSubject(surveyName, surveyDeadline, isReminder),
+            html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, appUrl, isReminder),
+            text: buildText(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, isReminder),
           });
           console.log(
             `[email] Sent to ${contact.contactEmail} (firm=${target.firmName}) messageId=${info.messageId} response=${info.response}`,
@@ -385,8 +432,6 @@ export async function POST(
         // If the recipient was already sent/reminded, treat this send as a reminder:
         // update status to 'reminded' and reminded_at, leaving sent_at untouched.
         // Otherwise (first send), set status to 'sent' and sent_at.
-        const isReminder =
-          target.currentStatus === 'sent' || target.currentStatus === 'reminded';
         const newStatus = isReminder ? 'reminded' : 'sent';
         const timestampCol = isReminder ? rRemindedAtCol : rSentAtCol;
 
