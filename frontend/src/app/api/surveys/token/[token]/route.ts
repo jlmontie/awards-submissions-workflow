@@ -53,7 +53,10 @@ export async function GET(
       sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Recipients!A:Z' }),
       sheets.spreadsheets.values.get({ spreadsheetId, range: 'Surveys!A:Z' }),
       sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Contacts!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Responses!A:Z' }),
+      // A:AZ matches the export route's range — Survey Responses has ~39
+      // columns (through AM), so A:Z (26 cols) would silently drop the
+      // Projects and Market Segments fields starting at column AA.
+      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Responses!A:AZ' }),
     ]);
 
     const recipientRows = recipientsRes.data.values || [];

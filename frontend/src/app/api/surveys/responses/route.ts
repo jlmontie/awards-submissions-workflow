@@ -69,9 +69,10 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
 
     // Look up existing response for this recipient (if any) so we can overwrite in place.
+    // A:AZ to cover the full response schema (~39 columns through AM).
     const responsesRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: 'Survey Responses!A:Z',
+      range: 'Survey Responses!A:AZ',
     });
     const responseRows = responsesRes.data.values || [];
     let existingResponseRowIndex = -1;
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
       // First submission: append a new row.
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: 'Survey Responses!A:Z',
+        range: 'Survey Responses!A:AZ',
         valueInputOption: 'USER_ENTERED',
         requestBody: { values: [responseRow] },
       });
