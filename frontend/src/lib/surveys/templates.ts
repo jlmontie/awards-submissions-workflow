@@ -74,8 +74,10 @@ export const architectSurveyTemplate: SurveyTemplate = {
     {
       title: 'Projects',
       fields: [
-        { key: 'largest_project_completed', label: 'Largest Utah project completed in {{prevYear}} (include location, city only)', type: 'text' },
-        { key: 'largest_project_upcoming', label: 'Largest Utah project to break ground in {{year}} (include location, city only)', type: 'text' },
+        { key: 'largest_project_completed', label: 'Largest Utah project completed in {{prevYear}}', type: 'text', half: true },
+        { key: 'largest_project_completed_location', label: 'Location (city only)', type: 'text', half: true },
+        { key: 'largest_project_upcoming', label: 'Largest Utah project to break ground in {{year}}', type: 'text', half: true },
+        { key: 'largest_project_upcoming_location', label: 'Location (city only)', type: 'text', half: true },
       ],
     },
     {

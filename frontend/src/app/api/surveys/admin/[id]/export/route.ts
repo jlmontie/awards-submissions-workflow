@@ -12,7 +12,8 @@ const RESPONSE_COLUMNS = [
   'zip', 'phone', 'marketing_email', 'website', 'other_locations',
   'num_employees', 'num_licensed_architects', 'num_leed_ap',
   'revenue_current', 'revenue_prior_1', 'revenue_prior_2', 'revenue_dnd',
-  'largest_project_completed', 'largest_project_upcoming',
+  'largest_project_completed', 'largest_project_completed_location',
+  'largest_project_upcoming', 'largest_project_upcoming_location',
   'pct_k12', 'pct_higher_ed', 'pct_civic', 'pct_healthcare',
   'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
   'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
@@ -55,6 +56,16 @@ function ordinal(n: number): string {
   return `${n}${suffixes[n % 10] || 'th'}`;
 }
 
+function joinProjectAndLocation(
+  project: string | undefined,
+  location: string | undefined,
+): string {
+  const p = (project || '').trim();
+  const l = (location || '').trim();
+  if (p && l) return `${p} — ${l}`;
+  return p || l || '';
+}
+
 function formatRevenue(value: string | undefined, isDnd: boolean): string {
   if (isDnd) return 'DND';
   if (!value || String(value).trim().toUpperCase() === 'DND') return 'DND';
@@ -72,9 +83,13 @@ type Firm = Record<string, string>;
 
 function getTopMarkets(firm: Firm, n = 3): [string, number][] {
   const markets: [string, number][] = [];
+  const customOther = (firm.other_segment_name || '').trim();
   for (const [key, displayName] of Object.entries(MARKET_DISPLAY_NAMES)) {
     const pct = parseFloat2(firm[key]);
-    if (pct > 0) markets.push([displayName, pct]);
+    if (pct > 0) {
+      const name = key === 'pct_other' && customOther ? customOther : displayName;
+      markets.push([name, pct]);
+    }
   }
   markets.sort((a, b) => b[1] - a[1]);
   while (markets.length < n) markets.push(['', 0]);
@@ -133,13 +148,22 @@ function formatFirm(firm: Firm): string {
 
   const topMarkets = getTopMarkets(firm);
 
+  const completedProject = joinProjectAndLocation(
+    firm.largest_project_completed,
+    firm.largest_project_completed_location,
+  );
+  const upcomingProject = joinProjectAndLocation(
+    firm.largest_project_upcoming,
+    firm.largest_project_upcoming_location,
+  );
+
   return [
     [firm.firm_name || '', firm.phone || '', firm.year_founded || '',
-     firm.top_executive || '', firm.largest_project_completed || '',
+     firm.top_executive || '', completedProject,
      firm.num_employees || '', revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])].join('\t'),
     [firm.address || '', firm.website || '', '',
-     firm.top_executive_title || '', firm.largest_project_upcoming || '',
+     firm.top_executive_title || '', upcomingProject,
      firm.num_licensed_architects || '', '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])].join('\t'),
     [cityStateZip, '', '', firm.years_at_firm || '', '',

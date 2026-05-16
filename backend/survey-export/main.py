@@ -32,7 +32,8 @@ RESPONSE_COLUMNS = [
     'zip', 'phone', 'marketing_email', 'website', 'other_locations',
     'num_employees', 'num_licensed_architects', 'num_leed_ap',
     'revenue_current', 'revenue_prior_1', 'revenue_prior_2', 'revenue_dnd',
-    'largest_project_completed', 'largest_project_upcoming',
+    'largest_project_completed', 'largest_project_completed_location',
+    'largest_project_upcoming', 'largest_project_upcoming_location',
     'pct_k12', 'pct_higher_ed', 'pct_civic', 'pct_healthcare',
     'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
     'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
@@ -85,6 +86,15 @@ def ordinal(n: int) -> str:
     return f'{n}{suffix}'
 
 
+def join_project_and_location(project, location) -> str:
+    """Combine a project name with its city into 'Project — City'."""
+    p = str(project or '').strip()
+    l = str(location or '').strip()
+    if p and l:
+        return f'{p} — {l}'
+    return p or l or ''
+
+
 def format_revenue(value: str, is_dnd: bool = False) -> str:
     """Format a revenue value for publication.
 
@@ -111,10 +121,12 @@ def format_pct(value) -> str:
 def get_top_markets(firm: Dict, n: int = 3) -> List[Tuple[str, float]]:
     """Get top N market segments by percentage."""
     markets = []
+    custom_other = str(firm.get('other_segment_name', '') or '').strip()
     for key, display_name in MARKET_DISPLAY_NAMES.items():
         pct = parse_float(firm.get(key, ''))
         if pct > 0:
-            markets.append((display_name, pct))
+            name = custom_other if key == 'pct_other' and custom_other else display_name
+            markets.append((name, pct))
     markets.sort(key=lambda x: x[1], reverse=True)
     # Pad to n entries
     while len(markets) < n:
@@ -192,6 +204,15 @@ def format_firm(firm: Dict) -> str:
     # Top 3 markets
     top_markets = get_top_markets(firm)
 
+    completed_project = join_project_and_location(
+        firm.get('largest_project_completed', ''),
+        firm.get('largest_project_completed_location', ''),
+    )
+    upcoming_project = join_project_and_location(
+        firm.get('largest_project_upcoming', ''),
+        firm.get('largest_project_upcoming_location', ''),
+    )
+
     # Build 3 rows
     lines = [
         # Row 1: firm name, phone, year, exec, project completed,
@@ -201,7 +222,7 @@ def format_firm(firm: Dict) -> str:
             str(firm.get('phone', '')),
             str(firm.get('year_founded', '')),
             str(firm.get('top_executive', '')),
-            str(firm.get('largest_project_completed', '')),
+            completed_project,
             str(firm.get('num_employees', '')),
             rev_current,
             rev_prior_1,
@@ -216,7 +237,7 @@ def format_firm(firm: Dict) -> str:
             str(firm.get('website', '')),
             '',
             str(firm.get('top_executive_title', '')),
-            str(firm.get('largest_project_upcoming', '')),
+            upcoming_project,
             str(firm.get('num_licensed_architects', '')),
             '',
             '',
