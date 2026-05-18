@@ -416,6 +416,9 @@ export default function SurveyForm({
                   </li>
                 ))}
               </ul>
+              <p className="mt-2 text-sm text-amber-900">
+                If you would like anyone added or removed from this list, please contact Ladd Marshall at lmarshall@utahcdmag.com.
+              </p>
               <p className="mt-2 text-xs text-amber-800">
                 Heads up: everyone above shares the same survey link. If multiple people fill it out
                 at the same time, only the most recently saved version will be kept. Coordinate
