@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import JSZip from 'jszip';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -121,17 +122,109 @@ function rowsToDicts(rows: string[][]): Firm[] {
 
 // ── Export formatting ───────────────────────────────────────────────
 
-function buildHeader(surveyYear: number): string {
+// Header lines as 11-cell arrays (one per row). The first row only fills the
+// "Annual Revenues" supertitle cell; the others fill column titles. Empty
+// strings are placeholders for cells that have no title on that row but still
+// participate in column alignment.
+function headerCells(surveyYear: number): string[][] {
   const prev = surveyYear - 1;
   const prev1 = surveyYear - 2;
   const prev2 = surveyYear - 3;
 
   return [
-    '\t\t\t\t\t\tAnnual Revenues (millions)',
-    `Firm Name\tPhone\tYear Est.\tTop Executive\tLargest Project to Finish in ${prev}\t# Employees\t${prev}\t${prev1}\t${prev2}\tTop Markets\t%`,
-    `Address\tWebsite\t\tTitle\tLargest Project to Start in ${surveyYear}\t# Lic. Archs`,
-    '\t\t\tYears at Firm\t\t# LEED AP',
+    ['', '', '', '', '', '', 'Annual Revenues (millions)', '', '', '', ''],
+    ['Firm Name', 'Phone', 'Year Est.', 'Top Executive', `Largest Project to Finish in ${prev}`, '# Employees', `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
+    ['Address', 'Website', '', 'Title', `Largest Project to Start in ${surveyYear}`, '# Lic. Archs', '', '', '', '', ''],
+    ['', '', '', 'Years at Firm', '', '# LEED AP', '', '', '', '', ''],
+  ];
+}
+
+function buildHeader(surveyYear: number): string {
+  return headerCells(surveyYear).map((row) => row.join('\t')).join('\n');
+}
+
+// ── RTF formatting ──────────────────────────────────────────────────
+//
+// The publication designer's legacy workflow opens an .rtf in InDesign or
+// TextEdit, where the document's embedded Courier font + half-inch tab stops
+// (\deftab720) lay each row out as an aligned grid. We replicate that here so
+// the designer's "Place File" workflow keeps working unchanged.
+//
+// At Courier 12pt, one tab stop = 720 twips = ~5 characters. Column targets
+// below are character positions chosen to give each column enough headroom for
+// the widest cell in that column; cells shorter than the column width are
+// padded with tabs to reach the next column's start position.
+
+const RTF_TAB_CHARS = 5; // chars per tab stop at Courier 12pt + \deftab720
+const ARCH_COLUMN_POSITIONS = [0, 25, 45, 55, 80, 145, 155, 165, 175, 185, 200];
+
+function rtfEscape(s: string): string {
+  let out = '';
+  for (const ch of s) {
+    const code = ch.charCodeAt(0);
+    if (ch === '\\') out += '\\\\';
+    else if (ch === '{') out += '\\{';
+    else if (ch === '}') out += '\\}';
+    else if (code < 0x20) { /* drop control chars */ }
+    else if (code > 0x7F) out += `\\u${code}?`;
+    else out += ch;
+  }
+  return out;
+}
+
+// Tabs needed to advance from `currentPos` to (or past) `targetPos`, given
+// stops every `RTF_TAB_CHARS` positions. Returns at least 1 so cells always
+// have a separator even when content overflows its column.
+function tabsToReach(currentPos: number, targetPos: number): { tabs: number; newPos: number } {
+  let pos = currentPos;
+  let tabs = 0;
+  while (pos < targetPos) {
+    pos = Math.floor(pos / RTF_TAB_CHARS) * RTF_TAB_CHARS + RTF_TAB_CHARS;
+    tabs++;
+  }
+  if (tabs === 0) {
+    // currentPos >= targetPos — content overran its column. Emit one tab so
+    // the next column lands at the next stop after where we are.
+    pos = Math.floor(currentPos / RTF_TAB_CHARS) * RTF_TAB_CHARS + RTF_TAB_CHARS;
+    tabs = 1;
+  }
+  return { tabs, newPos: pos };
+}
+
+function rtfRow(cells: string[], positions: number[]): string {
+  let pos = 0;
+  let out = '';
+  for (let i = 0; i < cells.length; i++) {
+    if (i > 0) {
+      const { tabs, newPos } = tabsToReach(pos, positions[i] ?? pos + RTF_TAB_CHARS);
+      out += '\t'.repeat(tabs);
+      pos = newPos;
+    }
+    const escaped = rtfEscape(cells[i]);
+    out += escaped;
+    pos += cells[i].length;
+  }
+  return out;
+}
+
+// Wrap a sequence of row strings (each already RTF-escaped + tab-padded) in
+// the RTF document envelope. Mirrors the legacy file's header so the designer
+// gets the same Courier-12pt + half-inch-tab-stop layout in Place File.
+function wrapRtf(rows: string[]): string {
+  const header = [
+    String.raw`{\rtf1\ansi\ansicpg1252\cocoartf2578`,
+    String.raw`\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fmodern\fcharset0 Courier;}`,
+    String.raw`{\colortbl;\red255\green255\blue255;}`,
+    String.raw`\margl1440\margr1440\vieww30920\viewh17560\viewkind0`,
+    String.raw`\deftab720`,
+    String.raw`\pard\pardeftab720\sl280\partightenfactor0`,
+    String.raw`\f0\fs24 \cf0`,
   ].join('\n');
+  // Each row terminates with `\` (RTF line break inside a paragraph). Empty
+  // rows are emitted as a single `\` so blank lines survive in the rendered
+  // output.
+  const body = rows.map((r) => `${r}\\`).join('\n');
+  return `${header}\n${body}\n}\n`;
 }
 
 // Survey free-text state field has historically been entered as either
@@ -143,7 +236,10 @@ function normalizeState(raw: string | undefined): string {
   return s;
 }
 
-function formatFirm(firm: Firm): string {
+// Each firm spans three 11-cell rows. Returning the cell arrays (rather than
+// pre-joined strings) lets both the TXT and RTF formatters reuse the same
+// data — they just join differently.
+function firmCells(firm: Firm): string[][] {
   const isDnd = String(firm.revenue_dnd || '').toUpperCase() === 'TRUE';
 
   const revCurrent = formatRevenue(firm.revenue_current, isDnd);
@@ -170,21 +266,27 @@ function formatFirm(firm: Firm): string {
     [firm.firm_name || '', firm.phone || '', firm.year_founded || '',
      firm.top_executive || '', completedProject,
      firm.num_employees || '', revCurrent, revPrior1, revPrior2,
-     topMarkets[0][0], formatPct(topMarkets[0][1])].join('\t'),
+     topMarkets[0][0], formatPct(topMarkets[0][1])],
     [firm.address || '', firm.website || '', '',
      firm.top_executive_title || '', upcomingProject,
      firm.num_licensed_architects || '', '', '', '',
-     topMarkets[1][0], formatPct(topMarkets[1][1])].join('\t'),
+     topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', '', firm.years_at_firm || '', '',
      firm.num_leed_ap || '', '', '', '',
-     topMarkets[2][0], formatPct(topMarkets[2][1])].join('\t'),
-  ].join('\n');
+     topMarkets[2][0], formatPct(topMarkets[2][1])],
+  ];
 }
+
+function formatFirm(firm: Firm): string {
+  return firmCells(firm).map((row) => row.join('\t')).join('\n');
+}
+
+type ExportFile = { txt: string; rtf: string };
 
 function generateExport(
   responses: Firm[],
   surveyYear: number,
-): { utah: string; outOfState: string | null } {
+): { utah: ExportFile; outOfState: ExportFile | null } {
   const utahRevenue: Firm[] = [];
   const utahDnd: Firm[] = [];
   const outOfState: Firm[] = [];
@@ -208,10 +310,36 @@ function generateExport(
   const prevYear = surveyYear - 1;
   const nth = ordinal(surveyYear - 2012);
 
-  const parts: string[] = [];
-  parts.push(`${surveyYear} Top Utah Architectural Firm Rankings`);
-  parts.push('');
-  parts.push(
+  // Walk the firm buckets once and emit both TXT and RTF line-by-line. Both
+  // formats share the same logical structure (titles, blank rows, header
+  // rows, firm rows \u00d7 3); only the per-row encoding differs.
+  const txtLines: string[] = [];
+  const rtfLines: string[] = [];
+
+  function pushTextLine(s: string) {
+    txtLines.push(s);
+    rtfLines.push(rtfEscape(s));
+  }
+  function pushBlankLine() {
+    txtLines.push('');
+    rtfLines.push('');
+  }
+  function pushHeaderRows() {
+    for (const row of headerCells(surveyYear)) {
+      txtLines.push(row.join('\t'));
+      rtfLines.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+    }
+  }
+  function pushFirmRows(firm: Firm) {
+    for (const row of firmCells(firm)) {
+      txtLines.push(row.join('\t'));
+      rtfLines.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+    }
+  }
+
+  pushTextLine(`${surveyYear} Top Utah Architectural Firm Rankings`);
+  pushBlankLine();
+  pushTextLine(
     `Utah Construction + Design is pleased to publish its ${nth} annual ` +
     `list of the Top Architectural Firms in Utah, based on revenues ` +
     `generated in ${prevYear} by a firm\u2019s Utah offices. Projects ` +
@@ -219,29 +347,32 @@ function generateExport(
     `Firms who chose not to disclose revenues (DND) are listed after ` +
     `revenue-disclosing firms by number of employees.`,
   );
-  parts.push('');
-  parts.push(buildHeader(surveyYear));
-  parts.push('');
+  pushBlankLine();
+  pushHeaderRows();
+  pushBlankLine();
 
   for (const firm of utahRevenue) {
-    parts.push(formatFirm(firm));
-    parts.push('');
+    pushFirmRows(firm);
+    pushBlankLine();
   }
 
   if (utahDnd.length) {
-    parts.push('');
-    parts.push('Firms that Did Not Disclose Revenues (listed by # of employees)');
-    parts.push('');
-    parts.push('');
+    pushBlankLine();
+    pushTextLine('Firms that Did Not Disclose Revenues (listed by # of employees)');
+    pushBlankLine();
+    pushBlankLine();
     for (const firm of utahDnd) {
-      parts.push(formatFirm(firm));
-      parts.push('');
+      pushFirmRows(firm);
+      pushBlankLine();
     }
   }
 
-  const utahText = parts.join('\n');
+  const utah: ExportFile = {
+    txt: txtLines.join('\n'),
+    rtf: wrapRtf(rtfLines),
+  };
 
-  let oosText: string | null = null;
+  let oos: ExportFile | null = null;
   if (outOfState.length) {
     const oosRevenue = outOfState.filter(
       (f) => String(f.revenue_dnd || '').toUpperCase() !== 'TRUE',
@@ -252,21 +383,37 @@ function generateExport(
     oosRevenue.sort((a, b) => parseFloat2(b.revenue_current) - parseFloat2(a.revenue_current));
     oosDnd.sort((a, b) => parseInt2(b.num_employees) - parseInt2(a.num_employees));
 
-    const oosParts: string[] = [];
-    oosParts.push(`${surveyYear} Top Architectural Firm Rankings - Out of State`);
-    oosParts.push('');
-    oosParts.push(buildHeader(surveyYear));
-    oosParts.push('');
-
-    for (const firm of [...oosRevenue, ...oosDnd]) {
-      oosParts.push(formatFirm(firm));
-      oosParts.push('');
+    const oosTxt: string[] = [];
+    const oosRtf: string[] = [];
+    function pushOosLine(s: string) { oosTxt.push(s); oosRtf.push(rtfEscape(s)); }
+    function pushOosBlank() { oosTxt.push(''); oosRtf.push(''); }
+    function pushOosHeader() {
+      for (const row of headerCells(surveyYear)) {
+        oosTxt.push(row.join('\t'));
+        oosRtf.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+      }
+    }
+    function pushOosFirm(firm: Firm) {
+      for (const row of firmCells(firm)) {
+        oosTxt.push(row.join('\t'));
+        oosRtf.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+      }
     }
 
-    oosText = oosParts.join('\n');
+    pushOosLine(`${surveyYear} Top Architectural Firm Rankings - Out of State`);
+    pushOosBlank();
+    pushOosHeader();
+    pushOosBlank();
+
+    for (const firm of [...oosRevenue, ...oosDnd]) {
+      pushOosFirm(firm);
+      pushOosBlank();
+    }
+
+    oos = { txt: oosTxt.join('\n'), rtf: wrapRtf(oosRtf) };
   }
 
-  return { utah: utahText, outOfState: oosText };
+  return { utah, outOfState: oos };
 }
 
 // ── Route handler ──────────────────────────────────────────────────
@@ -330,16 +477,33 @@ export async function GET(
     const format = request.nextUrl.searchParams.get('format');
 
     if (format === 'json') {
-      return NextResponse.json({ utah, outOfState });
+      // The results-page preview parses the TXT to extract firm names. Keep
+      // the JSON shape stable (txt-only) so the preview doesn't need to know
+      // about RTF.
+      return NextResponse.json({
+        utah: utah.txt,
+        outOfState: outOfState?.txt ?? null,
+      });
     }
 
-    // Default: return Utah file as downloadable text
-    const filename = `${surveyYear}_ArchRankings.txt`;
-    return new NextResponse(utah, {
+    // Default: return a ZIP containing both .txt and .rtf for each file.
+    // The designer's InDesign workflow uses the .rtf (Courier + half-inch
+    // tab stops embedded, looks aligned in TextEdit); scripts and Convert-
+    // Text-to-Table flows use the .txt (single-tab delimited).
+    const zip = new JSZip();
+    const baseName = `${surveyYear}_ArchRankings`;
+    zip.file(`${baseName}.txt`, utah.txt);
+    zip.file(`${baseName}.rtf`, utah.rtf);
+    if (outOfState) {
+      zip.file(`${baseName}_OutOfState.txt`, outOfState.txt);
+      zip.file(`${baseName}_OutOfState.rtf`, outOfState.rtf);
+    }
+    const zipBuffer = await zip.generateAsync({ type: 'arraybuffer' });
+    return new NextResponse(zipBuffer, {
       status: 200,
       headers: {
-        'Content-Type': 'text/plain; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Type': 'application/zip',
+        'Content-Disposition': `attachment; filename="${baseName}.zip"`,
       },
     });
   } catch (error: any) {

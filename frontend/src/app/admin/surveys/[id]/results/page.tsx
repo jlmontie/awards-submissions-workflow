@@ -148,7 +148,7 @@ export default function ResultsPage() {
       a.href = url;
       a.download =
         res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
-        'export.txt';
+        'export.zip';
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -193,7 +193,7 @@ export default function ResultsPage() {
             disabled={!!error}
             className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
           >
-            Download Export (.txt)
+            Download Export (.zip)
           </button>
         </div>
       </div>
