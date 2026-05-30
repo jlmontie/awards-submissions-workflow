@@ -1,6 +1,6 @@
 # Cloud Run service for Next.js frontend
 resource "google_cloud_run_v2_service" "frontend" {
-  name     = "${local.name_prefix}-frontend"
+  name     = "${local.shared_prefix}-frontend"
   location = var.region
   
   labels = local.common_labels
@@ -56,8 +56,8 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
-        name  = "SHEET_ID"
-        value = var.master_sheet_id
+        name  = "AWARDS_SHEET_ID"
+        value = var.awards_sheet_id
       }
 
       env {

@@ -1,3 +1,5 @@
+import { normalizers, type NormalizerName } from './normalizers';
+
 export interface SurveyField {
   key: string;
   label: string;
@@ -8,6 +10,11 @@ export interface SurveyField {
   hideWhen?: string;
   /** Half-width in the grid layout */
   half?: boolean;
+  /**
+   * Named normalizer applied server-side at write-time, before persisting to
+   * the sheet. See `normalizers.ts` for the available names.
+   */
+  normalize?: NormalizerName;
 }
 
 export interface SurveySection {
@@ -42,20 +49,20 @@ export const architectSurveyTemplate: SurveyTemplate = {
     {
       title: 'General Company Information',
       fields: [
-        { key: 'firm_name', label: 'Name of Firm', type: 'text', required: true },
-        { key: 'location', label: 'Location', type: 'text', required: true, half: true },
+        { key: 'firm_name', label: 'Name of Firm', type: 'text', required: true, normalize: 'trim' },
+        { key: 'location', label: 'Location', type: 'text', required: true, half: true, normalize: 'trim' },
         { key: 'year_founded', label: 'Year Founded', type: 'number', required: true, half: true },
-        { key: 'top_executive', label: 'Top Executive', type: 'text', required: true, half: true },
-        { key: 'top_executive_title', label: 'Title', type: 'text', required: true, half: true },
+        { key: 'top_executive', label: 'Top Executive', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'top_executive_title', label: 'Title', type: 'text', required: true, half: true, normalize: 'trim' },
         { key: 'years_at_firm', label: 'Years at Firm', type: 'number', required: true, half: true },
-        { key: 'address', label: 'Address', type: 'text', required: true },
-        { key: 'city', label: 'City', type: 'text', required: true, half: true },
-        { key: 'state', label: 'State', type: 'text', required: true, half: true, placeholder: 'UT' },
-        { key: 'zip', label: 'ZIP', type: 'text', required: true, half: true },
-        { key: 'phone', label: 'Phone', type: 'tel', required: true, half: true },
-        { key: 'marketing_email', label: 'Email of Marketing/BD Manager', type: 'email', required: true, half: true },
-        { key: 'website', label: 'Website', type: 'url', required: true, half: true },
-        { key: 'other_locations', label: 'Other Utah Office Locations (city only)', type: 'text', half: true },
+        { key: 'address', label: 'Address', type: 'text', required: true, normalize: 'trim' },
+        { key: 'city', label: 'City', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'state', label: 'State', type: 'text', required: true, half: true, placeholder: 'UT', normalize: 'usState' },
+        { key: 'zip', label: 'ZIP', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'phone', label: 'Phone', type: 'tel', required: true, half: true, normalize: 'trim' },
+        { key: 'marketing_email', label: 'Email of Marketing/BD Manager', type: 'email', required: true, half: true, normalize: 'email' },
+        { key: 'website', label: 'Website', type: 'url', required: true, half: true, normalize: 'trim' },
+        { key: 'other_locations', label: 'Other Utah Office Locations (city only)', type: 'text', half: true, normalize: 'trim' },
         { key: 'num_employees', label: 'Number of Employees (all Utah offices)', type: 'number', required: true, half: true },
         { key: 'num_licensed_architects', label: '# of Licensed Architects', type: 'number', required: true, half: true },
         { key: 'num_leed_ap', label: '# LEED AP', type: 'number', half: true },
@@ -74,10 +81,10 @@ export const architectSurveyTemplate: SurveyTemplate = {
     {
       title: 'Projects',
       fields: [
-        { key: 'largest_project_completed', label: 'Largest Utah project completed in {{prevYear}}', type: 'text', half: true },
-        { key: 'largest_project_completed_location', label: 'Location (city only)', type: 'text', half: true },
-        { key: 'largest_project_upcoming', label: 'Largest Utah project to break ground in {{year}}', type: 'text', half: true },
-        { key: 'largest_project_upcoming_location', label: 'Location (city only)', type: 'text', half: true },
+        { key: 'largest_project_completed', label: 'Largest Utah project completed in {{prevYear}}', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_completed_location', label: 'Location (city only)', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_upcoming', label: 'Largest Utah project to break ground in {{year}}', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_upcoming_location', label: 'Location (city only)', type: 'text', half: true, normalize: 'trim' },
       ],
     },
     {
@@ -95,7 +102,7 @@ export const architectSurveyTemplate: SurveyTemplate = {
         { key: 'pct_commercial_retail', label: 'Commercial/Retail', type: 'percent', half: true },
         { key: 'pct_sports_rec', label: 'Sports/Rec', type: 'percent', half: true },
         { key: 'pct_industrial', label: 'Industrial', type: 'percent', half: true },
-        { key: 'other_segment_name', label: 'Other (please specify)', type: 'text', half: true, placeholder: 'e.g., Mission Critical' },
+        { key: 'other_segment_name', label: 'Other (please specify)', type: 'text', half: true, placeholder: 'e.g., Mission Critical', normalize: 'trim' },
         { key: 'pct_other', label: 'Other %', type: 'percent', half: true },
       ],
     },
@@ -105,3 +112,27 @@ export const architectSurveyTemplate: SurveyTemplate = {
 export const surveyTemplates: Record<string, SurveyTemplate> = {
   architects: architectSurveyTemplate,
 };
+
+/**
+ * Apply each field's named normalizer to the submission data. Returns a new
+ * object — does not mutate the input. Fields without a `normalize` tag, or
+ * keys not present in `data`, are left untouched.
+ *
+ * Called server-side from the responses POST route. Centralizing this at the
+ * write boundary means any path that reaches the sheet (form submit, draft
+ * restore, edit) gets the same cleaning.
+ */
+export function normalizeSubmission(
+  template: SurveyTemplate,
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...data };
+  for (const section of template.sections) {
+    for (const field of section.fields) {
+      if (field.normalize && field.key in out) {
+        out[field.key] = normalizers[field.normalize](out[field.key]);
+      }
+    }
+  }
+  return out;
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import { surveyTemplates, normalizeSubmission } from '@/lib/surveys/templates';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -68,6 +69,28 @@ export async function POST(request: NextRequest) {
     const recipientId = recipientRow[recipientIdCol];
     const now = new Date().toISOString();
 
+    // Resolve the survey's template so we can normalize submission values
+    // (e.g. 'Utah' → 'UT' on the state field). Falls through with no
+    // normalization if the survey or template can't be resolved — we'd
+    // rather write the submission than block on a template lookup.
+    const surveysRes = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Surveys!A:Z',
+    });
+    const surveyRows = surveysRes.data.values || [];
+    let normalized: Record<string, unknown> = data;
+    if (surveyRows.length >= 2) {
+      const sHeaders = surveyRows[0];
+      const sIdCol = sHeaders.indexOf('survey_id');
+      const sTemplateCol = sHeaders.indexOf('template_id');
+      const surveyRow = surveyRows.slice(1).find((r) => r[sIdCol] === surveyId);
+      const templateId = surveyRow && sTemplateCol !== -1 ? surveyRow[sTemplateCol] : '';
+      const template = templateId ? surveyTemplates[templateId] : undefined;
+      if (template) {
+        normalized = normalizeSubmission(template, data);
+      }
+    }
+
     // Look up existing response for this recipient (if any) so we can overwrite in place.
     // A:AZ to cover the full response schema (~39 columns through AM).
     const responsesRes = await sheets.spreadsheets.values.get({
@@ -98,54 +121,55 @@ export async function POST(request: NextRequest) {
       existingResponseId ||
       `SR-${new Date().getFullYear()}-${String(responseRows.length).padStart(3, '0')}`;
 
-    // 3. Build response row
+    // 3. Build response row from the normalized data
     // Column order matches the plan's response sheet structure
+    const d = normalized;
     const responseRow = [
       responseId,
       surveyId,
       recipientId,
       token,
       now,
-      data.firm_name || '',
-      data.location || '',
-      data.year_founded || '',
-      data.top_executive || '',
-      data.top_executive_title || '',
-      data.years_at_firm || '',
-      data.address || '',
-      data.city || '',
-      data.state || '',
-      data.zip || '',
-      data.phone || '',
-      data.marketing_email || '',
-      data.website || '',
-      data.other_locations || '',
-      data.num_employees || '',
-      data.num_licensed_architects || '',
-      data.num_leed_ap || '',
-      data.revenue_current || '',
-      data.revenue_prior_1 || '',
-      data.revenue_prior_2 || '',
-      data.revenue_dnd ? 'TRUE' : 'FALSE',
-      data.largest_project_completed || '',
-      data.largest_project_completed_location || '',
-      data.largest_project_upcoming || '',
-      data.largest_project_upcoming_location || '',
-      data.pct_k12 || '',
-      data.pct_higher_ed || '',
-      data.pct_civic || '',
-      data.pct_healthcare || '',
-      data.pct_office || '',
-      data.pct_resort_hospitality || '',
-      data.pct_multi_family || '',
-      data.pct_commercial_retail || '',
-      data.pct_sports_rec || '',
-      data.pct_industrial || '',
-      data.pct_other || '',
+      d.firm_name || '',
+      d.location || '',
+      d.year_founded || '',
+      d.top_executive || '',
+      d.top_executive_title || '',
+      d.years_at_firm || '',
+      d.address || '',
+      d.city || '',
+      d.state || '',
+      d.zip || '',
+      d.phone || '',
+      d.marketing_email || '',
+      d.website || '',
+      d.other_locations || '',
+      d.num_employees || '',
+      d.num_licensed_architects || '',
+      d.num_leed_ap || '',
+      d.revenue_current || '',
+      d.revenue_prior_1 || '',
+      d.revenue_prior_2 || '',
+      d.revenue_dnd ? 'TRUE' : 'FALSE',
+      d.largest_project_completed || '',
+      d.largest_project_completed_location || '',
+      d.largest_project_upcoming || '',
+      d.largest_project_upcoming_location || '',
+      d.pct_k12 || '',
+      d.pct_higher_ed || '',
+      d.pct_civic || '',
+      d.pct_healthcare || '',
+      d.pct_office || '',
+      d.pct_resort_hospitality || '',
+      d.pct_multi_family || '',
+      d.pct_commercial_retail || '',
+      d.pct_sports_rec || '',
+      d.pct_industrial || '',
+      d.pct_other || '',
       // New column appended at the end of the schema (see RESPONSE_COLUMNS in
       // export/route.ts and token/[token]/route.ts). Keeps existing column
       // positions stable so historical Sheet data doesn't need to migrate.
-      data.other_segment_name || '',
+      d.other_segment_name || '',
     ];
 
     if (existingResponseRowIndex !== -1) {

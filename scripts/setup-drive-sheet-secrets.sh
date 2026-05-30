@@ -40,14 +40,14 @@ echo ""
 echo "Storing secrets in Google Secret Manager..."
 
 # Store Drive Folder ID
-echo -n "$DRIVE_FOLDER_ID" | gcloud secrets versions add "awards-${ENVIRONMENT}-drive-folder" \
+echo -n "$DRIVE_FOLDER_ID" | gcloud secrets versions add "ucd-${ENVIRONMENT}-awards-drive-folder" \
     --project="$PROJECT_ID" \
     --data-file=-
 
 echo "✓ Drive folder ID stored"
 
 # Store Sheet ID
-echo -n "$SHEET_ID" | gcloud secrets versions add "awards-${ENVIRONMENT}-sheet-id" \
+echo -n "$SHEET_ID" | gcloud secrets versions add "ucd-${ENVIRONMENT}-awards-sheet-id" \
     --project="$PROJECT_ID" \
     --data-file=-
 

@@ -40,7 +40,7 @@ from googleapiclient.errors import HttpError
 
 # Configuration
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID', 'your-project-id')
-SHEET_ID = os.environ.get('SHEET_ID', None)
+AWARDS_SHEET_ID = os.environ.get('AWARDS_SHEET_ID', None)
 
 
 def get_secret(secret_id: str) -> str:
@@ -387,12 +387,12 @@ def main():
     args = parser.parse_args()
     
     # Get sheet ID
-    sheet_id = args.sheet_id or SHEET_ID
+    sheet_id = args.sheet_id or AWARDS_SHEET_ID
     if not sheet_id:
         try:
-            sheet_id = get_secret('awards-production-sheet-id')
+            sheet_id = get_secret('ucd-production-awards-sheet-id')
         except:
-            print("✗ SHEET_ID not provided")
+            print("✗ AWARDS_SHEET_ID not provided")
             sys.exit(1)
     
     # Output sheet defaults to same as source

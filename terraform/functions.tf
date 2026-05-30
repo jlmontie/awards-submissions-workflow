@@ -26,7 +26,7 @@ resource "google_storage_bucket_object" "photo_processor_zip" {
 
 # Cloud Function for PDF processing
 resource "google_cloudfunctions2_function" "pdf_processor" {
-  name        = "${local.name_prefix}-pdf-processor"
+  name        = "${local.awards_prefix}-pdf-processor"
   location    = var.region
   description = "Processes uploaded PDFs and creates Drive folders"
 
@@ -52,12 +52,12 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
     all_traffic_on_latest_revision   = true
 
     environment_variables = {
-      GCP_PROJECT_ID       = var.project_id
-      DRIVE_FOLDER_SECRET  = google_secret_manager_secret.drive_folder.secret_id
-      SHEET_ID_SECRET      = google_secret_manager_secret.sheet_id.secret_id
-      SUBMISSIONS_BUCKET   = google_storage_bucket.submissions.name
-      MAX_PDF_SIZE_MB      = var.max_pdf_size_mb
-      DRIVE_OWNER_EMAIL    = var.drive_owner_email
+      GCP_PROJECT_ID          = var.project_id
+      DRIVE_FOLDER_SECRET     = google_secret_manager_secret.drive_folder.secret_id
+      AWARDS_SHEET_ID_SECRET  = google_secret_manager_secret.awards_sheet_id.secret_id
+      SUBMISSIONS_BUCKET      = google_storage_bucket.submissions.name
+      MAX_PDF_SIZE_MB         = var.max_pdf_size_mb
+      DRIVE_OWNER_EMAIL       = var.drive_owner_email
     }
   }
 
@@ -92,7 +92,7 @@ resource "google_cloud_run_service_iam_member" "pdf_processor_invoker" {
 
 # Cloud Function for photo processing
 resource "google_cloudfunctions2_function" "photo_processor" {
-  name        = "${local.name_prefix}-photo-processor"
+  name        = "${local.awards_prefix}-photo-processor"
   location    = var.region
   description = "Processes uploaded photos and moves to Drive"
 
@@ -174,7 +174,7 @@ resource "google_storage_bucket_object" "survey_export_zip" {
 
 resource "google_cloudfunctions2_function" "survey_export" {
   count       = var.survey_sheet_id != "" ? 1 : 0
-  name        = "${local.name_prefix}-survey-export"
+  name        = "${local.survey_prefix}-export"
   location    = var.region
   description = "Exports survey responses as tab-delimited text for publication"
 

@@ -32,7 +32,7 @@ from datetime import datetime
 
 # Configuration
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID', 'your-project-id')
-SHEET_ID = os.environ.get('SHEET_ID', None)
+AWARDS_SHEET_ID = os.environ.get('AWARDS_SHEET_ID', None)
 
 
 def get_secret(secret_id: str) -> str:
@@ -405,18 +405,18 @@ Examples:
     parser.add_argument('--list-pending', action='store_true', help='List pending submissions')
     parser.add_argument('--list-winners', action='store_true', help='List all winners')
     parser.add_argument('--list-all', action='store_true', help='List all submissions')
-    parser.add_argument('--sheet-id', help='Override SHEET_ID environment variable')
-    
+    parser.add_argument('--sheet-id', help='Override AWARDS_SHEET_ID environment variable')
+
     args = parser.parse_args()
-    
+
     # Get sheet ID
-    sheet_id = args.sheet_id or SHEET_ID
+    sheet_id = args.sheet_id or AWARDS_SHEET_ID
     if not sheet_id:
         try:
-            sheet_id = get_secret('awards-production-sheet-id')
+            sheet_id = get_secret('ucd-production-awards-sheet-id')
         except:
-            print("✗ SHEET_ID not provided")
-            print("  Set SHEET_ID environment variable or use --sheet-id")
+            print("✗ AWARDS_SHEET_ID not provided")
+            print("  Set AWARDS_SHEET_ID environment variable or use --sheet-id")
             sys.exit(1)
     
     # Get authenticated service

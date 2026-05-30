@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Environment variables
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID')
 DRIVE_FOLDER_SECRET = os.environ.get('DRIVE_FOLDER_SECRET')
-SHEET_ID_SECRET = os.environ.get('SHEET_ID_SECRET')
+AWARDS_SHEET_ID_SECRET = os.environ.get('AWARDS_SHEET_ID_SECRET')
 SUBMISSIONS_BUCKET = os.environ.get('SUBMISSIONS_BUCKET')
 MAX_PDF_SIZE_MB = int(os.environ.get('MAX_PDF_SIZE_MB', 50))
 DRIVE_OWNER_EMAIL = os.environ.get('DRIVE_OWNER_EMAIL')  # Email of Drive folder owner
@@ -661,7 +661,7 @@ def process_pdf(cloud_event):
         )
         
         # Prepare row for Sheets
-        sheet_id = get_secret(SHEET_ID_SECRET)
+        sheet_id = get_secret(AWARDS_SHEET_ID_SECRET)
         sheets_service = get_sheets_service()
         
         # Generate unique Awards ID for this submission

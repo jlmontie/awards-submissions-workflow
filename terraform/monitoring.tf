@@ -1,6 +1,6 @@
 # Log-based metric for PDF processing failures
 resource "google_logging_metric" "pdf_processing_errors" {
-  name = "${local.name_prefix}-pdf-errors"
+  name = "${local.awards_prefix}-pdf-errors"
 
   depends_on = [google_project_service.required_apis]
   filter = <<-EOT
@@ -27,7 +27,7 @@ resource "google_logging_metric" "pdf_processing_errors" {
 
 # Alert policy for PDF processing errors
 resource "google_monitoring_alert_policy" "pdf_processing_errors" {
-  display_name = "${local.name_prefix} PDF Processing Errors"
+  display_name = "${local.awards_prefix} PDF Processing Errors"
   combiner     = "OR"
   
   conditions {
@@ -73,7 +73,7 @@ resource "google_monitoring_notification_channel" "email" {
 # Dashboard for monitoring
 resource "google_monitoring_dashboard" "main" {
   dashboard_json = jsonencode({
-    displayName = "${local.name_prefix} Awards Submission Dashboard"
+    displayName = "${local.awards_prefix} Submission Dashboard"
     
     gridLayout = {
       widgets = [

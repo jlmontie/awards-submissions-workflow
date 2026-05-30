@@ -4,7 +4,8 @@ region     = "us-central1"
 
 # Google Drive & Sheets Configuration
 drive_root_folder_id = "your-google-drive-folder-id"  # Get from Drive URL
-master_sheet_id      = "your-google-sheet-id"         # Get from Sheets URL
+awards_sheet_id      = "your-awards-sheet-id"         # Awards submissions sheet
+survey_sheet_id      = "your-survey-sheet-id"         # Survey responses sheet (optional)
 
 # Google Service Account
 google_service_account_key_file = "your-api-key-json-filepath"

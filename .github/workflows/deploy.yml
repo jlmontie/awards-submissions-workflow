@@ -7,7 +7,10 @@ on:
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
-  SERVICE: awards-production-frontend
+  # Cloud Run service was renamed in the awards/survey nomenclature cleanup.
+  # Artifact Registry repo name (awards-production) was kept as-is to preserve
+  # the existing image — see terraform/main.tf comment on `name_prefix`.
+  SERVICE: ucd-production-frontend
   IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/awards-production/frontend
 
 jobs:

@@ -62,13 +62,25 @@ resource "random_id" "suffix" {
 }
 
 locals {
+  # Legacy prefix kept for storage buckets, service accounts, and the artifact
+  # registry — renaming those would destroy submission PDFs / break Drive shares /
+  # invalidate the current Docker image. The names are internal-only so the cost
+  # of cleanup isn't worth the churn.
   name_prefix = "awards-${var.environment}"
   name_suffix = random_id.suffix.hex
+
+  # Umbrella prefix for resources shared across awards + survey apps
+  # (frontend Cloud Run service, shared secrets like the Sheets SA key).
+  shared_prefix = "ucd-${var.environment}"
+
+  # App-specific prefixes for resources that belong to one app only.
+  awards_prefix = "${local.shared_prefix}-awards"
+  survey_prefix = "${local.shared_prefix}-survey"
 
   common_labels = {
     environment = var.environment
     managed_by  = "terraform"
-    project     = "awards-submissions"
+    project     = "ucd-tools"
   }
 
   google_service_account_key = file(var.google_service_account_key_file)

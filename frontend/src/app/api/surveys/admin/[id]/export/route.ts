@@ -134,6 +134,15 @@ function buildHeader(surveyYear: number): string {
   ].join('\n');
 }
 
+// Survey free-text state field has historically been entered as either
+// 'UT' or 'Utah' (and possibly with whitespace). Normalize to the 2-letter
+// abbreviation everywhere so Utah firms aren't misrouted to out-of-state.
+function normalizeState(raw: string | undefined): string {
+  const s = (raw || 'UT').trim().toUpperCase();
+  if (!s || s === 'UTAH') return 'UT';
+  return s;
+}
+
 function formatFirm(firm: Firm): string {
   const isDnd = String(firm.revenue_dnd || '').toUpperCase() === 'TRUE';
 
@@ -142,7 +151,7 @@ function formatFirm(firm: Firm): string {
   const revPrior2 = formatRevenue(firm.revenue_prior_2, isDnd);
 
   const city = (firm.city || '').trim();
-  const state = (firm.state || 'UT').trim().toUpperCase() || 'UT';
+  const state = normalizeState(firm.state);
   const zip = (firm.zip || '').trim();
   const cityStateZip = `${city}, ${state} ${zip}`;
 
@@ -181,7 +190,7 @@ function generateExport(
   const outOfState: Firm[] = [];
 
   for (const firm of responses) {
-    const state = (firm.state || 'UT').trim().toUpperCase() || 'UT';
+    const state = normalizeState(firm.state);
     const isDnd = String(firm.revenue_dnd || '').toUpperCase() === 'TRUE';
 
     if (state !== 'UT') {

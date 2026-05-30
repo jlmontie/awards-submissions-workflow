@@ -20,8 +20,8 @@ variable "drive_root_folder_id" {
   type        = string
 }
 
-variable "master_sheet_id" {
-  description = "Google Sheets ID for master submission data"
+variable "awards_sheet_id" {
+  description = "Google Sheets ID for the awards submissions sheet"
   type        = string
 }
 
@@ -83,7 +83,7 @@ variable "drive_owner_email" {
 }
 
 variable "survey_sheet_id" {
-  description = "Google Sheets ID for survey data"
+  description = "Google Sheets ID for the survey responses sheet"
   type        = string
   default     = ""
 }

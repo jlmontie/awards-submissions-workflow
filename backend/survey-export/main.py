@@ -118,6 +118,15 @@ def format_pct(value) -> str:
     return ''
 
 
+def normalize_state(raw) -> str:
+    # Free-text state field is sometimes entered as 'Utah' instead of 'UT'.
+    # Normalize so Utah firms don't get misrouted to the out-of-state file.
+    s = (str(raw or 'UT')).strip().upper()
+    if not s or s == 'UTAH':
+        return 'UT'
+    return s
+
+
 def get_top_markets(firm: Dict, n: int = 3) -> List[Tuple[str, float]]:
     """Get top N market segments by percentage."""
     markets = []
@@ -195,9 +204,7 @@ def format_firm(firm: Dict) -> str:
 
     # City, State ZIP
     city = str(firm.get('city', '')).strip()
-    state = (str(firm.get('state', '')) or 'UT').strip().upper()
-    if not state:
-        state = 'UT'
+    state = normalize_state(firm.get('state', ''))
     zip_code = str(firm.get('zip', '')).strip()
     city_state_zip = f'{city}, {state} {zip_code}'
 
@@ -278,9 +285,7 @@ def generate_export(
     out_of_state = []
 
     for firm in responses:
-        state = (str(firm.get('state', '')) or 'UT').strip().upper()
-        if not state:
-            state = 'UT'
+        state = normalize_state(firm.get('state', ''))
         is_dnd = str(firm.get('revenue_dnd', '')).upper() == 'TRUE'
 
         if state != 'UT':

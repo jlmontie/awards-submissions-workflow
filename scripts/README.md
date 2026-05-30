@@ -13,9 +13,10 @@ Mark submissions as winners until the web admin dashboard is ready.
 ```bash
 # Set environment variables
 export GCP_PROJECT_ID="your-project-id"
-export SHEET_ID="your-sheet-id"
+export AWARDS_SHEET_ID="your-awards-sheet-id"
 
-# Or the script will try to get SHEET_ID from Secret Manager
+# Or the script will try to get the sheet ID from Secret Manager
+# (ucd-production-awards-sheet-id)
 ```
 
 ### Usage

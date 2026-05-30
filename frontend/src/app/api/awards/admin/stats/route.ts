@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 
 async function getSheetData() {
   const sheets = await getSheetsClient(true);
-  const spreadsheetId = process.env.SHEET_ID;
+  const spreadsheetId = process.env.AWARDS_SHEET_ID;
 
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId,
