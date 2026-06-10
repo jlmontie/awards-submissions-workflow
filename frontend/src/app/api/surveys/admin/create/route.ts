@@ -26,9 +26,39 @@ export async function POST(request: NextRequest) {
 
     const sheets = await getSheetsClient();
 
-    // Generate survey_id from template + year (e.g., ARCH-2026)
+    // survey_id is the human-readable join key on every other sheet
+    // (recipients, responses), so it has to be unique. Deterministic
+    // ${prefix}-${year} (e.g., ARCH-2026). If one already exists for this
+    // template+year, refuse — production should only ever have one survey
+    // per (template, year), so a collision is almost always the admin
+    // re-clicking "New Survey" instead of opening the existing draft.
+    // For testing, use a fictitious year to keep IDs unique.
     const prefix = templateId === 'architects' ? 'ARCH' : templateId.toUpperCase().slice(0, 4);
     const surveyId = `${prefix}-${year}`;
+
+    const existingRes = await sheets.spreadsheets.values.get({
+      spreadsheetId,
+      range: 'Surveys!A:G',
+    });
+    const existingRows = existingRes.data.values || [];
+    if (existingRows.length >= 2) {
+      const headers = existingRows[0];
+      const idCol = headers.indexOf('survey_id');
+      const nameCol = headers.indexOf('name');
+      const statusCol = headers.indexOf('status');
+      const collision = existingRows.slice(1).find((row) => row[idCol] === surveyId);
+      if (collision) {
+        return NextResponse.json(
+          {
+            error: `A survey already exists for ${templateId} ${year}.`,
+            existingSurveyId: surveyId,
+            existingSurveyName: nameCol !== -1 ? collision[nameCol] || '' : '',
+            existingSurveyStatus: statusCol !== -1 ? collision[statusCol] || '' : '',
+          },
+          { status: 409 },
+        );
+      }
+    }
 
     // Append survey row to Surveys tab
     // Columns: survey_id | name | category | year | deadline | status | template_id

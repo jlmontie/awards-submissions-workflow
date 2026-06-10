@@ -15,6 +15,11 @@ export default function NewSurveyPage() {
   const [deadline, setDeadline] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [conflict, setConflict] = useState<{
+    id: string;
+    name: string;
+    status: string;
+  } | null>(null);
 
   function handleTemplateChange(tid: string) {
     setTemplateId(tid);
@@ -36,6 +41,7 @@ export default function NewSurveyPage() {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+    setConflict(null);
 
     try {
       const res = await fetch('/api/surveys/admin/create', {
@@ -43,6 +49,16 @@ export default function NewSurveyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId, name, year, deadline }),
       });
+
+      if (res.status === 409) {
+        const data = await res.json();
+        setConflict({
+          id: data.existingSurveyId,
+          name: data.existingSurveyName || data.existingSurveyId,
+          status: data.existingSurveyStatus || '',
+        });
+        return;
+      }
 
       if (!res.ok) {
         const data = await res.json();
@@ -155,6 +171,31 @@ export default function NewSurveyPage() {
             </div>
           </div>
         </div>
+
+        {conflict && (
+          <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+            <p className="text-sm text-yellow-900">
+              A survey already exists for this template and year:{' '}
+              <strong>{conflict.name}</strong>
+              {conflict.status && (
+                <span className="text-yellow-800"> (status: {conflict.status})</span>
+              )}
+              .
+            </p>
+            <p className="mt-2 text-sm text-yellow-800">
+              Open the existing survey instead, or change the year to create a new
+              one (use a fictitious year for testing).
+            </p>
+            <div className="mt-3">
+              <Link
+                href={`/admin/surveys/${conflict.id}`}
+                className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-navy-600"
+              >
+                Open {conflict.id} →
+              </Link>
+            </div>
+          </div>
+        )}
 
         {error && (
           <div className="rounded-md bg-red-50 p-4">
