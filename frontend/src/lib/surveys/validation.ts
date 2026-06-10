@@ -51,12 +51,23 @@ export function validateSurvey(
             errors[field.key] = 'Enter a valid number';
           }
           break;
-        case 'currency':
+        case 'currency': {
           // Allow numbers with optional $ and commas
-          if (strValue && isNaN(Number(strValue.replace(/[$,]/g, '')))) {
+          const raw = strValue.replace(/[$,]/g, '');
+          const num = Number(raw);
+          if (strValue && isNaN(num)) {
             errors[field.key] = 'Enter a valid dollar amount';
+          } else if (strValue && num > 10000) {
+            // Revenue is entered in millions — anything over 10,000 (= $10B) is
+            // almost certainly a value entered in raw dollars instead.
+            errors[field.key] = 'Enter revenue in millions (e.g., 47.50, not 47,500,000)';
+          } else if (strValue && !/^\d+\.\d{2}$/.test(raw)) {
+            // Two decimal places required so ties at the hundreds-of-K place
+            // resolve in the ranking export.
+            errors[field.key] = 'Enter exactly two decimal places (e.g., 47.50)';
           }
           break;
+        }
         case 'percent':
           if (strValue) {
             const num = Number(strValue.replace(/%/g, ''));

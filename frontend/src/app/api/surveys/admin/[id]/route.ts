@@ -101,19 +101,29 @@ export async function GET(
       const rSentAtCol = rHeaders.indexOf('sent_at');
       const rRemindedAtCol = rHeaders.indexOf('reminded_at');
       const rCompletedCol = rHeaders.indexOf('completed_at');
+      const rNotesCol = rHeaders.indexOf('notes');
 
       for (let i = 1; i < recipientRows.length; i++) {
         const row = recipientRows[i];
         if (row[rSurveyIdCol] === surveyId) {
           const firmName = row[rFirmCol] || '';
+          // reminded_at is a pipe-separated history of ISO timestamps so we
+          // can render the full reminder log (not just the latest).
+          const rawReminded = rRemindedAtCol !== -1 ? row[rRemindedAtCol] || '' : '';
+          const remindedHistory = rawReminded
+            .split('|')
+            .map((s: string) => s.trim())
+            .filter(Boolean);
           recipients.push({
             recipientId: row[rIdCol] || '',
             firmName,
             token: row[rTokenCol] || '',
             status: row[rStatusCol] || 'pending',
             sentAt: rSentAtCol !== -1 ? row[rSentAtCol] || '' : '',
-            remindedAt: rRemindedAtCol !== -1 ? row[rRemindedAtCol] || '' : '',
+            remindedAt: remindedHistory[remindedHistory.length - 1] || '',
+            remindedHistory,
             completedAt: rCompletedCol !== -1 ? row[rCompletedCol] || '' : '',
+            notes: rNotesCol !== -1 ? row[rNotesCol] || '' : '',
             contacts: contactsByFirm[firmName] || [],
           });
         }

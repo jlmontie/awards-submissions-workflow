@@ -430,10 +430,20 @@ export async function POST(
 
       if (recipientSentOk) {
         // If the recipient was already sent/reminded, treat this send as a reminder:
-        // update status to 'reminded' and reminded_at, leaving sent_at untouched.
+        // update status to 'reminded' and APPEND to reminded_at history (pipe-
+        // separated ISO timestamps), leaving sent_at untouched.
         // Otherwise (first send), set status to 'sent' and sent_at.
         const newStatus = isReminder ? 'reminded' : 'sent';
         const timestampCol = isReminder ? rRemindedAtCol : rSentAtCol;
+
+        let newTimestampValue = now;
+        if (isReminder && rRemindedAtCol !== -1) {
+          // sheetRowIndex is 1-indexed; the recipientRows snapshot from
+          // earlier in this request has the same indexing offset.
+          const prior = recipientRows[target.sheetRowIndex - 1];
+          const existing = (prior?.[rRemindedAtCol] || '').trim();
+          newTimestampValue = existing ? `${existing}|${now}` : now;
+        }
 
         const updates: Promise<any>[] = [];
         if (rStatusCol !== -1) {
@@ -452,7 +462,7 @@ export async function POST(
               spreadsheetId,
               range: `Survey Recipients!${columnLetter(timestampCol)}${target.sheetRowIndex}`,
               valueInputOption: 'USER_ENTERED',
-              requestBody: { values: [[now]] },
+              requestBody: { values: [[newTimestampValue]] },
             }),
           );
         }

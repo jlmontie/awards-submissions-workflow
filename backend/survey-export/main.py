@@ -259,10 +259,10 @@ def header_cells(survey_year: int) -> List[List[str]]:
     return [
         ['', '', '', '', '', '', 'Annual Revenues (millions)', '', '', '', ''],
         ['Firm Name', 'Phone', 'Year Est.', 'Top Executive',
-         f'Largest Project to Finish in {prev}', '# Employees',
+         f'Largest Utah Project to Finish in {prev}', '# Employees',
          str(prev), str(prev1), str(prev2), 'Top Markets', '%'],
         ['Address', 'Website', '', 'Title',
-         f'Largest Project to Start in {survey_year}', '# Lic. Archs',
+         f'Largest Utah Project to Start in {survey_year}', '# Lic. Archs',
          '', '', '', '', ''],
         ['', '', '', 'Years at Firm', '', '# LEED AP', '', '', '', '', ''],
     ]

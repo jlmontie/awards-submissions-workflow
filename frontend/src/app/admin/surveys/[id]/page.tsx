@@ -26,7 +26,9 @@ interface Recipient {
   status: string;
   sentAt: string;
   remindedAt: string;
+  remindedHistory: string[];
   completedAt: string;
+  notes: string;
   contacts: Contact[];
 }
 
@@ -45,6 +47,8 @@ export default function SurveyDetailPage() {
   const [expandedFirms, setExpandedFirms] = useState<Set<string>>(new Set());
   const [actionLoading, setActionLoading] = useState(false);
   const [emailResult, setEmailResult] = useState('');
+  const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
+  const [notesSaving, setNotesSaving] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
 
   useEffect(() => {
     loadSurvey();
@@ -58,10 +62,41 @@ export default function SurveyDetailPage() {
       const data = await res.json();
       setSurvey(data.survey);
       setRecipients(data.recipients);
+      const drafts: Record<string, string> = {};
+      for (const r of data.recipients as Recipient[]) drafts[r.recipientId] = r.notes || '';
+      setNotesDraft(drafts);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function saveNotes(recipientId: string) {
+    setNotesSaving((prev) => ({ ...prev, [recipientId]: 'saving' }));
+    try {
+      const res = await fetch(
+        `/api/surveys/admin/${surveyId}/recipient/${recipientId}/notes`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: notesDraft[recipientId] ?? '' }),
+        },
+      );
+      if (!res.ok) throw new Error('Save failed');
+      setNotesSaving((prev) => ({ ...prev, [recipientId]: 'saved' }));
+      setRecipients((prev) =>
+        prev.map((r) =>
+          r.recipientId === recipientId
+            ? { ...r, notes: notesDraft[recipientId] ?? '' }
+            : r,
+        ),
+      );
+      setTimeout(() => {
+        setNotesSaving((prev) => ({ ...prev, [recipientId]: 'idle' }));
+      }, 2000);
+    } catch {
+      setNotesSaving((prev) => ({ ...prev, [recipientId]: 'error' }));
     }
   }
 
@@ -481,7 +516,16 @@ export default function SurveyDetailPage() {
                         {formatDate(r.sentAt)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
-                        {formatDate(r.remindedAt)}
+                        {r.remindedHistory && r.remindedHistory.length > 1 ? (
+                          <span title={r.remindedHistory.map(formatDate).join(', ')}>
+                            {formatDate(r.remindedAt)}{' '}
+                            <span className="text-xs text-gray-400">
+                              (+{r.remindedHistory.length - 1})
+                            </span>
+                          </span>
+                        ) : (
+                          formatDate(r.remindedAt)
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500">
                         {formatDate(r.completedAt)}
@@ -495,23 +539,94 @@ export default function SurveyDetailPage() {
                         </code>
                       </td>
                     </tr>
-                    {/* Expanded contacts row */}
-                    {expandedFirms.has(r.recipientId) && r.contacts.length > 0 && (
-                      <tr key={`${r.recipientId}-contacts`}>
+                    {/* Expanded detail row */}
+                    {expandedFirms.has(r.recipientId) && (
+                      <tr key={`${r.recipientId}-detail`}>
                         <td colSpan={8} className="px-4 py-0">
-                          <div className="ml-10 py-2 border-l-2 border-secondary-400 pl-4">
-                            <p className="text-xs font-medium text-gray-500 uppercase mb-1">
-                              Contacts at {r.firmName}
-                            </p>
-                            <div className="space-y-1">
-                              {r.contacts.map((c, i) => (
-                                <div key={i} className="text-sm text-gray-600">
-                                  {c.contactName}{' '}
-                                  <span className="text-gray-400">
-                                    &lt;{c.contactEmail}&gt;
-                                  </span>
+                          <div className="ml-10 py-3 border-l-2 border-secondary-400 pl-4 space-y-4">
+                            {r.contacts.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase mb-1">
+                                  Contacts at {r.firmName}
+                                </p>
+                                <div className="space-y-1">
+                                  {r.contacts.map((c, i) => (
+                                    <div key={i} className="text-sm text-gray-600">
+                                      {c.contactName}{' '}
+                                      <span className="text-gray-400">
+                                        &lt;{c.contactEmail}&gt;
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              </div>
+                            )}
+
+                            {r.remindedHistory && r.remindedHistory.length > 0 && (
+                              <div>
+                                <p className="text-xs font-medium text-gray-500 uppercase mb-1">
+                                  Reminders sent ({r.remindedHistory.length})
+                                </p>
+                                <ul className="text-sm text-gray-600 list-disc list-inside space-y-0.5">
+                                  {r.remindedHistory.map((ts, i) => (
+                                    <li key={i}>{new Date(ts).toLocaleString()}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {r.status === 'completed' && (
+                              <div>
+                                <Link
+                                  href={`/admin/surveys/${surveyId}/recipient/${r.recipientId}`}
+                                  className="inline-flex text-sm font-medium text-charcoal-500 hover:text-secondary-400"
+                                >
+                                  View submitted response &rarr;
+                                </Link>
+                              </div>
+                            )}
+
+                            <div>
+                              <label
+                                htmlFor={`notes-${r.recipientId}`}
+                                className="block text-xs font-medium text-gray-500 uppercase mb-1"
+                              >
+                                Notes
+                              </label>
+                              <textarea
+                                id={`notes-${r.recipientId}`}
+                                value={notesDraft[r.recipientId] ?? ''}
+                                onChange={(e) =>
+                                  setNotesDraft((prev) => ({
+                                    ...prev,
+                                    [r.recipientId]: e.target.value,
+                                  }))
+                                }
+                                rows={3}
+                                className="block w-full rounded-md border border-gray-300 shadow-sm sm:text-sm px-3 py-2 focus:border-primary-500 focus:ring-primary-500"
+                                placeholder="Internal notes about this firm (visible only to admins)"
+                              />
+                              <div className="mt-1 flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => saveNotes(r.recipientId)}
+                                  disabled={
+                                    notesSaving[r.recipientId] === 'saving' ||
+                                    (notesDraft[r.recipientId] ?? '') === (r.notes || '')
+                                  }
+                                  className="inline-flex items-center rounded-md border border-transparent bg-primary-500 px-3 py-1.5 text-xs font-medium text-black shadow-sm hover:bg-black hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  {notesSaving[r.recipientId] === 'saving'
+                                    ? 'Saving...'
+                                    : 'Save notes'}
+                                </button>
+                                {notesSaving[r.recipientId] === 'saved' && (
+                                  <span className="text-xs text-green-700">Saved</span>
+                                )}
+                                {notesSaving[r.recipientId] === 'error' && (
+                                  <span className="text-xs text-red-700">Save failed</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>

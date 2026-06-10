@@ -123,11 +123,18 @@ export default function SurveyForm({
             sectionErrors[field.key] = 'Enter a valid number';
           }
           break;
-        case 'currency':
-          if (strValue && isNaN(Number(strValue.replace(/[$,]/g, '')))) {
+        case 'currency': {
+          const raw = strValue.replace(/[$,]/g, '');
+          const num = Number(raw);
+          if (strValue && isNaN(num)) {
             sectionErrors[field.key] = 'Enter a valid dollar amount';
+          } else if (strValue && num > 10000) {
+            sectionErrors[field.key] = 'Enter revenue in millions (e.g., 47.50, not 47,500,000)';
+          } else if (strValue && !/^\d+\.\d{2}$/.test(raw)) {
+            sectionErrors[field.key] = 'Enter exactly two decimal places (e.g., 47.50)';
           }
           break;
+        }
         case 'percent':
           if (strValue) {
             const num = Number(strValue.replace(/%/g, ''));

@@ -133,8 +133,8 @@ function headerCells(surveyYear: number): string[][] {
 
   return [
     ['', '', '', '', '', '', 'Annual Revenues (millions)', '', '', '', ''],
-    ['Firm Name', 'Phone', 'Year Est.', 'Top Executive', `Largest Project to Finish in ${prev}`, '# Employees', `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
-    ['Address', 'Website', '', 'Title', `Largest Project to Start in ${surveyYear}`, '# Lic. Archs', '', '', '', '', ''],
+    ['Firm Name', 'Phone', 'Year Est.', 'Top Executive', `Largest Utah Project to Finish in ${prev}`, '# Employees', `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
+    ['Address', 'Website', '', 'Title', `Largest Utah Project to Start in ${surveyYear}`, '# Lic. Archs', '', '', '', '', ''],
     ['', '', '', 'Years at Firm', '', '# LEED AP', '', '', '', '', ''],
   ];
 }
