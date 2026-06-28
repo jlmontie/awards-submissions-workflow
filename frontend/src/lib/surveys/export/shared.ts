@@ -2,6 +2,8 @@
  * Shared helpers used by per-template export modules.
  */
 
+import { normalizers } from '../normalizers';
+
 export type Firm = Record<string, string>;
 
 export interface ExportSection {
@@ -82,6 +84,15 @@ export function normalizeState(raw: string | undefined): string {
   const s = (raw || 'UT').trim().toUpperCase();
   if (!s || s === 'UTAH') return 'UT';
   return s;
+}
+
+/**
+ * Re-normalize a phone value at export time. New submissions are already
+ * dash-formatted by the `phone` normalizer at write-time, but rows that
+ * landed in the sheet under the old parenthesized format get fixed up here.
+ */
+export function formatPhone(raw: string | undefined): string {
+  return normalizers.phone(raw);
 }
 
 /**
