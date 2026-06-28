@@ -12,11 +12,12 @@ export const runtime = 'nodejs';
  *
  * Query params:
  *   ?format=json   → JSON payload with all sections (used by the results UI;
- *                    .txt content only, RTF is omitted to keep the preview light)
- *   ?format=zip    → all sections bundled into a single .zip download with
- *                    both .txt and .rtf per section
- *   ?section=KEY   → just that section as a downloadable .txt
- *   (default)      → first section as a downloadable .txt
+ *                    plain-text rendering for the preview pane only — RTF
+ *                    is what the designer actually downloads)
+ *   ?format=zip    → all sections bundled into a single .zip download, .rtf
+ *                    file per section
+ *   ?section=KEY   → just that section as a downloadable .rtf
+ *   (default)      → first section as a downloadable .rtf
  *
  * Sections returned depend on the survey's template: architects yield up to
  * Utah + Out-of-State; contractors yield up to GC Overall + Out-of-State +
@@ -117,13 +118,15 @@ export async function GET(
     const sectionParam = request.nextUrl.searchParams.get('section');
 
     if (format === 'json') {
-      // Drop RTF — the preview UI just needs the .txt for display.
+      // `text` is a plain-text rendering used purely for the preview pane in
+      // the admin UI. The downloaded artifact is always RTF — InDesign's
+      // Place File workflow needs the embedded Courier + tab stops.
       return NextResponse.json({
         templateId,
         sections: sections.map((s) => ({
           key: s.key,
           label: s.label,
-          filename: `${s.baseName}.txt`,
+          filename: `${s.baseName}.rtf`,
           text: s.text,
           count: s.count,
         })),
@@ -133,7 +136,6 @@ export async function GET(
     if (format === 'zip') {
       const zip = new JSZip();
       for (const s of sections) {
-        zip.file(`${s.baseName}.txt`, s.text);
         zip.file(`${s.baseName}.rtf`, s.rtf);
       }
       const buf = await zip.generateAsync({ type: 'arraybuffer' });
@@ -147,14 +149,14 @@ export async function GET(
       });
     }
 
-    // Default / explicit single-section .txt download
+    // Default / explicit single-section .rtf download
     const section = sectionParam
       ? sections.find((s) => s.key === sectionParam)
       : sections[0];
     if (!section) {
       return NextResponse.json({ error: 'Section not found' }, { status: 404 });
     }
-    return downloadSectionTxt(section);
+    return downloadSectionRtf(section);
   } catch (error: any) {
     console.error('Error exporting survey:', error);
     return NextResponse.json(
@@ -164,12 +166,12 @@ export async function GET(
   }
 }
 
-function downloadSectionTxt(section: ExportSection): NextResponse {
-  return new NextResponse(section.text, {
+function downloadSectionRtf(section: ExportSection): NextResponse {
+  return new NextResponse(section.rtf, {
     status: 200,
     headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${section.baseName}.txt"`,
+      'Content-Type': 'application/rtf; charset=utf-8',
+      'Content-Disposition': `attachment; filename="${section.baseName}.rtf"`,
     },
   });
 }

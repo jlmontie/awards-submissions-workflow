@@ -138,14 +138,12 @@ export default function ResultsPage() {
           >
             Back to Survey
           </Link>
-          {payload && payload.sections.length > 0 && (
+          {payload && payload.sections.length > 1 && (
             <button
               onClick={handleDownloadZip}
               className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors"
             >
-              {payload.sections.length > 1
-                ? 'Download All (.zip)'
-                : 'Download Export (.zip)'}
+              Download All (.zip)
             </button>
           )}
         </div>
@@ -219,7 +217,7 @@ export default function ResultsPage() {
                   onClick={() => handleDownloadSection(activeSection)}
                   className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors"
                 >
-                  Download (.txt)
+                  Download (.rtf)
                 </button>
               </div>
               <div className="overflow-x-auto bg-gray-50">
