@@ -53,16 +53,19 @@ export const normalizers = {
     return US_STATE_NAMES[s] ?? s;
   },
 
-  // 10-digit US numbers → "(xxx) xxx-xxxx". 11-digit numbers starting with
-  // 1 lose the leading country code. Anything else passes through trimmed
-  // so we don't mangle international or extension-bearing entries.
+  // 10-digit US numbers → "xxx-xxx-xxxx". 11-digit numbers starting with 1
+  // lose the leading country code. Anything else passes through trimmed so
+  // we don't mangle international or extension-bearing entries. The
+  // all-dashes format is what the print designer wants in the export and
+  // is also the canonical form on the sheet so admin views, edit prefill,
+  // and export all stay consistent.
   phone: (raw: unknown): string => {
     const trimmed = String(raw ?? '').trim();
     if (!trimmed) return '';
     const digits = trimmed.replace(/\D/g, '');
     const ten = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
     if (ten.length !== 10) return trimmed;
-    return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+    return `${ten.slice(0, 3)}-${ten.slice(3, 6)}-${ten.slice(6)}`;
   },
 
   // Collapse whitespace, title-case words, then fold standalone directional

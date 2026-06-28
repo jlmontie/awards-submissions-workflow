@@ -16,6 +16,7 @@ import {
   type ExportSection,
   type Firm,
   formatPct,
+  formatPhone,
   formatRevenue,
   isTrue,
   joinProjectAndLocation,
@@ -114,7 +115,7 @@ function firmCells(firm: Firm): string[][] {
   );
 
   return [
-    [firm.firm_name || '', firm.phone || '', firm.year_founded || '',
+    [firm.firm_name || '', formatPhone(firm.phone), firm.year_founded || '',
      firm.top_executive || '', completedProject,
      firm.num_employees || '', revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
