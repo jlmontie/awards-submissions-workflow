@@ -68,15 +68,19 @@ export default function SurveyForm({
   const sectionNames = template.sections.map((s) => s.title);
   const isLastSection = currentSection === template.sections.length - 1;
 
-  // Compute percentage sum for percentage_group sections
+  // Compute percentage sum for percentage_group sections. Filter to percent
+  // fields only so sibling text inputs in the same section (e.g. "Other
+  // (please specify)") don't count toward the total.
   const percentageSum = useMemo(() => {
     if (section.type !== 'percentage_group') return null;
-    return section.fields.reduce((acc, field) => {
-      const val = data[field.key];
-      if (!val) return acc;
-      const num = Number(String(val).replace(/%/g, ''));
-      return acc + (isNaN(num) ? 0 : num);
-    }, 0);
+    return section.fields
+      .filter((f) => f.type === 'percent')
+      .reduce((acc, field) => {
+        const val = data[field.key];
+        if (!val) return acc;
+        const num = Number(String(val).replace(/%/g, ''));
+        return acc + (isNaN(num) ? 0 : num);
+      }, 0);
   }, [section, data]);
 
   function handleChange(key: string, value: string | boolean) {
@@ -155,8 +159,31 @@ export default function SurveyForm({
       }
     }
 
+    // Disciplines group: at least one checkbox must be true
+    if (section.type === 'disciplines_group') {
+      const anyChecked = section.fields.some((field) => !!data[field.key]);
+      if (!anyChecked) {
+        sectionErrors['_disciplines_group'] = 'Select at least one discipline.';
+      }
+    }
+
     setErrors(sectionErrors);
     return Object.keys(sectionErrors).length === 0;
+  }
+
+  /**
+   * True when the given section has any error in `allErrors`, whether on a
+   * specific field or as a section-level error (`_percentage_group`,
+   * `_disciplines_group`).
+   */
+  function sectionHasError(
+    sec: SurveyTemplate['sections'][number],
+    allErrors: Record<string, string>,
+  ): boolean {
+    if (sec.fields.some((f) => allErrors[f.key])) return true;
+    if (sec.type === 'percentage_group' && allErrors['_percentage_group']) return true;
+    if (sec.type === 'disciplines_group' && allErrors['_disciplines_group']) return true;
+    return false;
   }
 
   /** Save draft silently; returns true on success. */
@@ -208,9 +235,7 @@ export default function SurveyForm({
     const allErrors = validateSurvey(template, data);
     if (Object.keys(allErrors).length > 0) {
       for (let i = 0; i < template.sections.length; i++) {
-        const sectionFields = template.sections[i].fields;
-        const hasError = sectionFields.some((f) => allErrors[f.key]);
-        if (hasError || (template.sections[i].type === 'percentage_group' && allErrors['_percentage_group'])) {
+        if (sectionHasError(template.sections[i], allErrors)) {
           setCurrentSection(i);
           setErrors(allErrors);
           window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -249,9 +274,7 @@ export default function SurveyForm({
     const allErrors = validateSurvey(template, data);
     if (Object.keys(allErrors).length > 0) {
       for (let i = 0; i < template.sections.length; i++) {
-        const sectionFields = template.sections[i].fields;
-        const hasError = sectionFields.some((f) => allErrors[f.key]);
-        if (hasError || (template.sections[i].type === 'percentage_group' && allErrors['_percentage_group'])) {
+        if (sectionHasError(template.sections[i], allErrors)) {
           setShowSummary(false);
           setCurrentSection(i);
           setErrors(allErrors);
@@ -496,6 +519,9 @@ export default function SurveyForm({
       {/* Section-level errors */}
       {errors['_percentage_group'] && (
         <p className="mt-2 text-sm text-red-600">{errors['_percentage_group']}</p>
+      )}
+      {errors['_disciplines_group'] && (
+        <p className="mt-2 text-sm text-red-600">{errors['_disciplines_group']}</p>
       )}
 
       {/* Submit error */}

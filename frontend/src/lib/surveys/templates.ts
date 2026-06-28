@@ -20,8 +20,11 @@ export interface SurveyField {
 export interface SurveySection {
   title: string;
   description?: string;
-  /** If 'percentage_group', fields are percent inputs that should sum to 100 */
-  type?: 'percentage_group';
+  /**
+   * - 'percentage_group': fields are percent inputs that should sum to 100
+   * - 'disciplines_group': checkbox fields; at least one must be checked
+   */
+  type?: 'percentage_group' | 'disciplines_group';
   fields: SurveyField[];
 }
 
@@ -109,8 +112,95 @@ export const architectSurveyTemplate: SurveyTemplate = {
   ],
 };
 
+export const contractorSurveyTemplate: SurveyTemplate = {
+  id: 'contractors',
+  name: 'Top Utah General Contractor Rankings Survey',
+  sections: [
+    {
+      title: 'General Company Information',
+      fields: [
+        { key: 'firm_name', label: 'Name of Firm', type: 'text', required: true, normalize: 'trim' },
+        { key: 'year_founded', label: 'Year Founded', type: 'number', required: true, half: true },
+        { key: 'top_executive', label: 'Top Executive', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'top_executive_title', label: 'Title', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'years_at_firm', label: 'Years at Firm', type: 'number', required: true, half: true },
+        { key: 'address', label: 'Headquarters Address', type: 'text', required: true, normalize: 'address' },
+        { key: 'city', label: 'City', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'state', label: 'State', type: 'text', required: true, half: true, placeholder: 'UT', normalize: 'usState' },
+        { key: 'zip', label: 'ZIP', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'phone', label: 'Phone', type: 'tel', required: true, half: true, normalize: 'phone' },
+        { key: 'marketing_email', label: 'Email of Marketing/BD Manager', type: 'email', required: true, half: true, normalize: 'email' },
+        { key: 'website', label: 'Website', type: 'url', required: true, half: true, normalize: 'trim' },
+        { key: 'other_locations', label: 'Other Utah Office Locations (city only)', type: 'text', normalize: 'trim' },
+        { key: 'num_employees_ut', label: '# Employees in Utah Offices', type: 'number', required: true, half: true },
+        { key: 'num_employees_all', label: '# Employees in All U.S. Offices', type: 'number', required: true, half: true },
+      ],
+    },
+    {
+      title: 'Disciplines',
+      description: 'Select all disciplines your firm performs. This determines which ranking tables your firm will appear in. At least one is required.',
+      type: 'disciplines_group',
+      fields: [
+        { key: 'discipline_general_building', label: 'General Building', type: 'checkbox' },
+        { key: 'discipline_heavy_highway', label: 'Heavy/Highway', type: 'checkbox' },
+        { key: 'discipline_municipal_utility', label: 'Municipal/Utility', type: 'checkbox' },
+      ],
+    },
+    {
+      title: 'Revenues',
+      description: 'Annual revenues in millions, to two decimal places (e.g., enter 47.50 for $47.5 million). Report Utah office revenues and All U.S. office revenues separately. If your firm only has offices in Utah, leave the "All U.S." fields blank. Revenue figures are used for ranking — the second decimal breaks ties at the hundreds-of-thousands place. Check "Decline to Disclose" to be listed by employee count instead.',
+      fields: [
+        { key: 'revenue_dnd', label: 'Decline to Disclose (DND)', type: 'checkbox' },
+        { key: 'revenue_ut_current', label: '{{prevYear}} Utah Office Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+        { key: 'revenue_all_current', label: '{{prevYear}} All U.S. Offices Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+        { key: 'revenue_ut_prior_1', label: '{{prevYear-1}} Utah Office Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+        { key: 'revenue_all_prior_1', label: '{{prevYear-1}} All U.S. Offices Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+        { key: 'revenue_ut_prior_2', label: '{{prevYear-2}} Utah Office Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+        { key: 'revenue_all_prior_2', label: '{{prevYear-2}} All U.S. Offices Revenue (millions)', type: 'currency', hideWhen: 'revenue_dnd', half: true },
+      ],
+    },
+    {
+      title: 'Projects',
+      fields: [
+        { key: 'largest_project_completed', label: 'Largest Utah project completed in {{prevYear}}', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_completed_location', label: 'Location (city only)', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_upcoming', label: 'Largest Utah project started in {{year}}', type: 'text', half: true, normalize: 'trim' },
+        { key: 'largest_project_upcoming_location', label: 'Location (city only)', type: 'text', half: true, normalize: 'trim' },
+      ],
+    },
+    {
+      title: 'Top Markets',
+      description: 'Percentage of revenues from each market segment as whole numbers (e.g., enter 25 for 25%). No decimals. The total must equal 100%.',
+      type: 'percentage_group',
+      fields: [
+        { key: 'pct_k12', label: 'K-12', type: 'percent', half: true },
+        { key: 'pct_higher_ed', label: 'Higher Education', type: 'percent', half: true },
+        { key: 'pct_civic', label: 'Civic/Institutional', type: 'percent', half: true },
+        { key: 'pct_healthcare', label: 'Healthcare', type: 'percent', half: true },
+        { key: 'pct_multi_family', label: 'Multi-Family', type: 'percent', half: true },
+        { key: 'pct_commercial_retail', label: 'Commercial/Retail', type: 'percent', half: true },
+        { key: 'pct_industrial', label: 'Industrial', type: 'percent', half: true },
+        { key: 'pct_resort_hospitality', label: 'Resort/Hospitality', type: 'percent', half: true },
+        { key: 'pct_sports_rec', label: 'Sports/Rec', type: 'percent', half: true },
+        { key: 'pct_religious', label: 'Religious', type: 'percent', half: true },
+        { key: 'pct_underground', label: 'Underground', type: 'percent', half: true },
+        { key: 'pct_telecomm', label: 'Telecomm', type: 'percent', half: true },
+        { key: 'pct_wastewater', label: 'Wastewater', type: 'percent', half: true },
+        { key: 'pct_heavy_civil', label: 'Heavy Civil', type: 'percent', half: true },
+        { key: 'pct_water', label: 'Water', type: 'percent', half: true },
+        { key: 'pct_highway', label: 'Highway', type: 'percent', half: true },
+        { key: 'pct_oil_gas', label: 'Oil & Gas', type: 'percent', half: true },
+        { key: 'pct_power', label: 'Power', type: 'percent', half: true },
+        { key: 'other_segment_name', label: 'Other (please specify)', type: 'text', half: true, placeholder: 'e.g., Mission Critical', normalize: 'trim' },
+        { key: 'pct_other', label: 'Other %', type: 'percent', half: true },
+      ],
+    },
+  ],
+};
+
 export const surveyTemplates: Record<string, SurveyTemplate> = {
   architects: architectSurveyTemplate,
+  contractors: contractorSurveyTemplate,
 };
 
 /**

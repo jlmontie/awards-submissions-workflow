@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import {
+  RESPONSE_TABS,
+  SURVEYS_TAB,
+  SURVEY_RECIPIENTS_TAB,
+} from '@/lib/surveys/sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,25 +21,30 @@ export async function GET() {
 
     const sheets = await getSheetsClient(true);
 
-    // Fetch all three tabs in parallel
-    const [surveysRes, recipientsRes, responsesRes] = await Promise.all([
+    const responseTabNames = Object.values(RESPONSE_TABS);
+
+    // Fetch surveys, recipients, and all per-template response tabs in parallel.
+    // Each response fetch is wrapped to tolerate a missing tab (e.g. if a new
+    // template's sheet hasn't been created yet) without failing the whole list.
+    const [surveysRes, recipientsRes, ...responseResults] = await Promise.all([
       sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: 'Surveys!A:Z',
+        range: `${SURVEYS_TAB}!A:Z`,
       }),
       sheets.spreadsheets.values.get({
         spreadsheetId,
-        range: 'Survey Recipients!A:Z',
+        range: `${SURVEY_RECIPIENTS_TAB}!A:Z`,
       }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Survey Responses!A:B',
-      }),
+      ...responseTabNames.map((tab) =>
+        sheets.spreadsheets.values
+          .get({ spreadsheetId, range: `${tab}!A:B` })
+          .catch(() => null),
+      ),
     ]);
 
     const surveyRows = surveysRes.data.values || [];
     const recipientRows = recipientsRes.data.values || [];
-    const responseRows = responsesRes.data.values || [];
+    const responseRowsByTab = responseResults.map((r) => r?.data.values || []);
 
     if (surveyRows.length < 2) {
       return NextResponse.json([]);
@@ -60,12 +70,15 @@ export async function GET() {
       }
     }
 
-    // Build response counts by survey_id
+    // Build response counts by survey_id across all per-template response tabs
     const responseCounts: Record<string, number> = {};
-    if (responseRows.length >= 2) {
+    for (const responseRows of responseRowsByTab) {
+      if (responseRows.length < 2) continue;
       const respSurveyIdCol = responseRows[0].indexOf('survey_id');
+      if (respSurveyIdCol === -1) continue;
       for (let i = 1; i < responseRows.length; i++) {
         const sid = responseRows[i][respSurveyIdCol] || '';
+        if (!sid) continue;
         responseCounts[sid] = (responseCounts[sid] || 0) + 1;
       }
     }

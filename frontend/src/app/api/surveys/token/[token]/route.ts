@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import {
+  responseTabFor,
+  SURVEYS_TAB,
+  SURVEY_RECIPIENTS_TAB,
+  SURVEY_CONTACTS_TAB,
+} from '@/lib/surveys/sheets';
+import { ARCHITECT_RESPONSE_COLUMNS } from '@/lib/surveys/export/architects';
+import { CONTRACTOR_RESPONSE_COLUMNS } from '@/lib/surveys/export/contractors';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Canonical column order for "Survey Responses". Mirrors RESPONSE_COLUMNS in
-// the export route and the order written by /api/surveys/responses (POST).
-// Used as a fallback when the sheet has no header row.
-const RESPONSE_COLUMNS = [
-  'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
-  'firm_name', 'location', 'year_founded', 'top_executive',
-  'top_executive_title', 'years_at_firm', 'address', 'city', 'state',
-  'zip', 'phone', 'marketing_email', 'website', 'other_locations',
-  'num_employees', 'num_licensed_architects', 'num_leed_ap',
-  'revenue_current', 'revenue_prior_1', 'revenue_prior_2', 'revenue_dnd',
-  'largest_project_completed', 'largest_project_completed_location',
-  'largest_project_upcoming', 'largest_project_upcoming_location',
-  'pct_k12', 'pct_higher_ed', 'pct_civic', 'pct_healthcare',
-  'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
-  'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
-  'other_segment_name',
-];
 
 /**
  * GET /api/surveys/token/[token]
@@ -30,8 +20,40 @@ const RESPONSE_COLUMNS = [
  *
  * Sheets layout:
  *   "Surveys" sheet: survey_id | name | category | year | deadline | status | template_id
- *   "Survey Recipients" sheet: recipient_id | survey_id | firm_name | token | status | sent_at | reminded_at | completed_at
+ *   "Survey Recipients" sheet: recipient_id | survey_id | firm_name | token | status | sent_at | reminded_at | completed_at | draft_data | draft_saved_at
+ *   "Survey Responses - {Template}" sheet: per-template column schema
  */
+
+// Fields that the form sends as booleans and the sheet stores as 'TRUE'/'FALSE'.
+// When prefilling an existing submission for editing, these need to be coerced
+// back to booleans so the checkbox state restores correctly.
+const BOOLEAN_FIELDS = new Set([
+  'revenue_dnd',
+  'discipline_general_building',
+  'discipline_heavy_highway',
+  'discipline_municipal_utility',
+]);
+
+// Metadata columns that aren't form fields and shouldn't round-trip into the
+// edit form's data object.
+const METADATA_FIELDS = new Set([
+  'response_id',
+  'survey_id',
+  'recipient_id',
+  'token',
+  'submitted_at',
+  'created_at',
+]);
+
+function fallbackColumnsFor(templateId: string): string[] {
+  switch (templateId) {
+    case 'contractors':
+      return CONTRACTOR_RESPONSE_COLUMNS;
+    case 'architects':
+    default:
+      return ARCHITECT_RESPONSE_COLUMNS;
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -50,15 +72,12 @@ export async function GET(
 
     const sheets = await getSheetsClient(true);
 
-    // Fetch recipients, surveys, contacts, and responses in parallel
-    const [recipientsRes, surveysRes, contactsRes, responsesRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Recipients!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Surveys!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Contacts!A:Z' }),
-      // A:AZ matches the export route's range — Survey Responses has ~39
-      // columns (through AM), so A:Z (26 cols) would silently drop the
-      // Projects and Market Segments fields starting at column AA.
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Responses!A:AZ' }),
+    // Fetch recipients, surveys, and contacts in parallel. Responses are
+    // fetched after we know the templateId so we hit the right per-template tab.
+    const [recipientsRes, surveysRes, contactsRes] = await Promise.all([
+      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEY_RECIPIENTS_TAB}!A:Z` }),
+      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEYS_TAB}!A:Z` }),
+      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEY_CONTACTS_TAB}!A:Z` }),
     ]);
 
     const recipientRows = recipientsRes.data.values || [];
@@ -79,7 +98,6 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid sheet configuration' }, { status: 500 });
     }
 
-    // Find recipient by token
     const recipientRow = recipientRows.slice(1).find((row) => row[tokenCol] === token);
     if (!recipientRow) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
@@ -110,7 +128,6 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    // Check survey is active
     if (surveyRow[sStatusCol] === 'closed') {
       return NextResponse.json(
         { error: 'This survey has been closed.' },
@@ -119,6 +136,7 @@ export async function GET(
     }
 
     const surveyCategory = (surveyRow[sCategoryCol] || '').trim().toLowerCase();
+    const templateId = surveyRow[templateCol] || 'architects';
 
     // --- Firm collaborators (active contacts in this firm + category) ---
     const contactRows = contactsRes.data.values || [];
@@ -147,32 +165,45 @@ export async function GET(
     }
 
     // --- Determine prefill data ---
-    // If completed: load from Survey Responses (edit mode).
+    // If completed: load from the template-specific response tab (edit mode).
     // Otherwise: load draft_data from the recipient row.
     let prefillData: Record<string, string | boolean> | null = null;
     let prefillSavedAt: string | null = null;
 
     if (isCompleted) {
-      const responseRows = responsesRes.data.values || [];
-      if (responseRows.length > 0) {
-        // The sheet may or may not have a header row. Detect by checking A1.
-        const hasHeader =
-          (responseRows[0][0] || '').trim().toLowerCase() === 'response_id';
-        const headers = hasHeader
-          ? responseRows[0].map((h) => h.trim().toLowerCase())
-          : RESPONSE_COLUMNS;
-        const dataRows = hasHeader ? responseRows.slice(1) : responseRows;
+      let responseTab: string;
+      try {
+        responseTab = responseTabFor(templateId);
+      } catch {
+        // Unknown template — fall through with no prefill
+        responseTab = '';
+      }
 
-        const respRecipientCol = headers.indexOf('recipient_id');
-        const respSubmittedAtCol = headers.indexOf('submitted_at');
-        if (respRecipientCol !== -1) {
-          const responseRow = dataRows.find(
-            (row) => row[respRecipientCol] === recipientId,
-          );
-          if (responseRow) {
-            prefillData = responseRowToData(headers, responseRow);
-            prefillSavedAt =
-              respSubmittedAtCol !== -1 ? responseRow[respSubmittedAtCol] || null : null;
+      if (responseTab) {
+        const responsesRes = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${responseTab}!A:BZ`,
+        });
+        const responseRows = responsesRes.data.values || [];
+        if (responseRows.length > 0) {
+          const hasHeader =
+            (responseRows[0][0] || '').trim().toLowerCase() === 'response_id';
+          const headers = hasHeader
+            ? responseRows[0].map((h) => h.trim().toLowerCase())
+            : fallbackColumnsFor(templateId);
+          const dataRows = hasHeader ? responseRows.slice(1) : responseRows;
+
+          const respRecipientCol = headers.indexOf('recipient_id');
+          const respSubmittedAtCol = headers.indexOf('submitted_at');
+          if (respRecipientCol !== -1) {
+            const responseRow = dataRows.find(
+              (row) => row[respRecipientCol] === recipientId,
+            );
+            if (responseRow) {
+              prefillData = responseRowToData(headers, responseRow);
+              prefillSavedAt =
+                respSubmittedAtCol !== -1 ? responseRow[respSubmittedAtCol] || null : null;
+            }
           }
         }
       }
@@ -194,7 +225,7 @@ export async function GET(
         name: surveyRow[nameCol] || '',
         year: parseInt(surveyRow[yearCol] || new Date().getFullYear().toString(), 10),
         deadline: surveyRow[deadlineCol] || '',
-        templateId: surveyRow[templateCol] || 'architects',
+        templateId,
       },
       recipient: {
         firmName,
@@ -214,28 +245,19 @@ export async function GET(
 }
 
 /**
- * Convert a Survey Responses sheet row back into a form-data object,
- * coercing the DND checkbox value back to a boolean.
+ * Convert a response sheet row back into a form-data object. Coerces known
+ * boolean fields back to true/false; other fields pass through as strings.
  */
 function responseRowToData(
   headers: string[],
   row: string[],
 ): Record<string, string | boolean> {
   const data: Record<string, string | boolean> = {};
-  // Metadata columns are not form fields and should not be copied into data.
-  const skip = new Set([
-    'response_id',
-    'survey_id',
-    'recipient_id',
-    'token',
-    'submitted_at',
-    'created_at',
-  ]);
   for (let i = 0; i < headers.length; i++) {
     const key = headers[i];
-    if (!key || skip.has(key)) continue;
+    if (!key || METADATA_FIELDS.has(key)) continue;
     const val = row[i] ?? '';
-    if (key === 'revenue_dnd') {
+    if (BOOLEAN_FIELDS.has(key)) {
       data[key] = String(val).toUpperCase() === 'TRUE';
     } else {
       data[key] = val;
