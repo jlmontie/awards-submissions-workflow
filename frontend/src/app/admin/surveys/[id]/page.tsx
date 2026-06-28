@@ -129,10 +129,16 @@ export default function SurveyDetailPage() {
       });
       if (!res.ok) throw new Error('Failed to import recipients');
       const data = await res.json();
-      setImportResult(
-        `Imported ${data.imported} firm${data.imported !== 1 ? 's' : ''}` +
-        (data.skipped > 0 ? ` (${data.skipped} already existed, skipped)` : ''),
-      );
+      if (data.total === 0 && data.message) {
+        // Nothing matched — surface the API's diagnostic (e.g. "No active
+        // contacts found for category X") rather than the bland 0-count.
+        setImportResult(data.message);
+      } else {
+        setImportResult(
+          `Imported ${data.imported} firm${data.imported !== 1 ? 's' : ''}` +
+          (data.skipped > 0 ? ` (${data.skipped} already existed, skipped)` : ''),
+        );
+      }
       await loadSurvey();
     } catch (err: any) {
       setError(err.message);
