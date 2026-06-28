@@ -4,33 +4,18 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
-interface ExportData {
-  utah: string;
-  outOfState: string | null;
+interface ExportSection {
+  key: string;
+  label: string;
+  filename: string;
+  text: string;
+  count: number;
 }
 
-interface FirmPreview {
-  firmName: string;
-  revenue: string;
-  employees: string;
-  topMarket: string;
-  isDnd: boolean;
-  isOutOfState: boolean;
+interface ExportPayload {
+  templateId: string;
+  sections: ExportSection[];
 }
-
-const MARKET_DISPLAY_NAMES: Record<string, string> = {
-  pct_k12: 'K-12',
-  pct_higher_ed: 'Higher Ed',
-  pct_civic: 'Civic/Inst.',
-  pct_healthcare: 'Healthcare',
-  pct_office: 'Office',
-  pct_resort_hospitality: 'Resort/Hosp.',
-  pct_multi_family: 'Multi-Family',
-  pct_commercial_retail: 'Comm/Retail',
-  pct_sports_rec: 'Sports/Rec',
-  pct_industrial: 'Industrial',
-  pct_other: 'Other',
-};
 
 export default function ResultsPage() {
   const params = useParams();
@@ -38,7 +23,8 @@ export default function ResultsPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [firms, setFirms] = useState<FirmPreview[]>([]);
+  const [payload, setPayload] = useState<ExportPayload | null>(null);
+  const [activeKey, setActiveKey] = useState<string>('');
   const [surveyName, setSurveyName] = useState('');
 
   useEffect(() => {
@@ -49,14 +35,12 @@ export default function ResultsPage() {
     setLoading(true);
     setError('');
     try {
-      // Load survey detail for name
       const detailRes = await fetch(`/api/surveys/admin/${surveyId}`);
       if (detailRes.ok) {
         const detail = await detailRes.json();
         setSurveyName(detail.survey.name);
       }
 
-      // Load export data as JSON for preview
       const res = await fetch(
         `/api/surveys/admin/${surveyId}/export?format=json`,
       );
@@ -68,11 +52,11 @@ export default function ResultsPage() {
         throw new Error('Failed to load results');
       }
 
-      const data: ExportData = await res.json();
-
-      // Parse the text to extract firm data for preview table
-      const firmsList = parseExportForPreview(data.utah);
-      setFirms(firmsList);
+      const data: ExportPayload = await res.json();
+      setPayload(data);
+      if (data.sections.length) {
+        setActiveKey(data.sections[0].key);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -80,66 +64,30 @@ export default function ResultsPage() {
     }
   }
 
-  function parseExportForPreview(text: string): FirmPreview[] {
-    // The export text has firm blocks of 3 lines each separated by blank lines.
-    // Each block: line 1 = firm data, line 2 = address, line 3 = city/state.
-    // We only need line 1 of each block.
-    const lines = text.split('\n');
-    const previews: FirmPreview[] = [];
-    let inDndSection = false;
+  async function handleDownloadSection(section: ExportSection) {
+    try {
+      const res = await fetch(
+        `/api/surveys/admin/${surveyId}/export?section=${encodeURIComponent(section.key)}`,
+      );
+      if (!res.ok) throw new Error('Failed to download');
 
-    // Collect non-empty line groups separated by blank lines
-    let block: string[] = [];
-    for (let i = 0; i <= lines.length; i++) {
-      const line = i < lines.length ? lines[i] : '';
-      if (!line.trim()) {
-        if (block.length > 0) {
-          // Check first line of block for DND section marker
-          if (block[0].includes('Did Not Disclose Revenues')) {
-            inDndSection = true;
-            block = [];
-            continue;
-          }
-
-          // Skip header/metadata blocks
-          const first = block[0];
-          if (
-            first.startsWith('\t') ||
-            first.includes('Top Utah Architectural') ||
-            first.includes('pleased to publish') ||
-            first.includes('Firm Name\t') ||
-            first.includes('Out of State')
-          ) {
-            block = [];
-            continue;
-          }
-
-          // Parse first line of firm block: name, phone, year, exec, project, employees, rev, rev, rev, market, %
-          const cols = first.split('\t');
-          if (cols.length >= 7 && cols[0]) {
-            previews.push({
-              firmName: cols[0],
-              revenue: cols[6] || '',
-              employees: cols[5] || '',
-              topMarket: cols[9] || '',
-              isDnd: inDndSection || cols[6] === 'DND',
-              isOutOfState: false,
-            });
-          }
-
-          block = [];
-        }
-      } else {
-        block.push(line);
-      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = section.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message);
     }
-
-    return previews;
   }
 
-  async function handleDownload() {
+  async function handleDownloadZip() {
     try {
-      const res = await fetch(`/api/surveys/admin/${surveyId}/export`);
+      const res = await fetch(`/api/surveys/admin/${surveyId}/export?format=zip`);
       if (!res.ok) throw new Error('Failed to download');
 
       const blob = await res.blob();
@@ -148,7 +96,7 @@ export default function ResultsPage() {
       a.href = url;
       a.download =
         res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
-        'export.zip';
+        `${surveyId}_export.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -169,6 +117,8 @@ export default function ResultsPage() {
     );
   }
 
+  const activeSection = payload?.sections.find((s) => s.key === activeKey);
+
   return (
     <div className="px-4 sm:px-6 lg:px-8">
       {/* Header */}
@@ -188,13 +138,16 @@ export default function ResultsPage() {
           >
             Back to Survey
           </Link>
-          <button
-            onClick={handleDownload}
-            disabled={!!error}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
-          >
-            Download Export (.zip)
-          </button>
+          {payload && payload.sections.length > 0 && (
+            <button
+              onClick={handleDownloadZip}
+              className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors"
+            >
+              {payload.sections.length > 1
+                ? 'Download All (.zip)'
+                : 'Download Export (.zip)'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -215,79 +168,69 @@ export default function ResultsPage() {
           </svg>
           <p className="mt-4 text-gray-500">{error}</p>
         </div>
-      ) : (
-        /* Ranked Table Preview */
-        <div className="mt-8 bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-heading font-medium text-navy-500">
-              Ranked Firms ({firms.length})
-            </h2>
+      ) : payload ? (
+        <div className="mt-8">
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex flex-wrap gap-x-6" aria-label="Sections">
+              {payload.sections.map((section) => {
+                const isActive = section.key === activeKey;
+                return (
+                  <button
+                    key={section.key}
+                    onClick={() => setActiveKey(section.key)}
+                    className={`whitespace-nowrap border-b-2 py-3 px-1 text-sm font-medium ${
+                      isActive
+                        ? 'border-primary-500 text-navy-500'
+                        : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}
+                  >
+                    {section.label}
+                    <span
+                      className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        isActive
+                          ? 'bg-primary-100 text-primary-800'
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {section.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Rank
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Firm Name
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Employees
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Top Market
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {firms.map((firm, i) => {
-                  // Check if this is the transition from revenue to DND
-                  const prevFirm = i > 0 ? firms[i - 1] : null;
-                  const showSeparator =
-                    firm.isDnd && prevFirm && !prevFirm.isDnd;
 
-                  return (
-                    <>
-                      {showSeparator && (
-                        <tr key={`sep-${i}`}>
-                          <td
-                            colSpan={5}
-                            className="px-4 py-2 text-xs font-medium text-gray-500 bg-gray-100 uppercase"
-                          >
-                            Did Not Disclose Revenues (by # employees)
-                          </td>
-                        </tr>
-                      )}
-                      <tr key={i} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {i + 1}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          {firm.firmName}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {firm.revenue}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {firm.employees}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-500">
-                          {firm.topMarket}
-                        </td>
-                      </tr>
-                    </>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {/* Active section */}
+          {activeSection && (
+            <div className="mt-6 bg-white shadow rounded-lg overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-heading font-medium text-navy-500">
+                    {activeSection.label}
+                  </h2>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {activeSection.count} firm
+                    {activeSection.count === 1 ? '' : 's'} ·{' '}
+                    {activeSection.filename}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadSection(activeSection)}
+                  className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors"
+                >
+                  Download (.txt)
+                </button>
+              </div>
+              <div className="overflow-x-auto bg-gray-50">
+                <pre className="p-6 text-xs font-mono text-gray-900 whitespace-pre min-w-min">
+                  {activeSection.text}
+                </pre>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

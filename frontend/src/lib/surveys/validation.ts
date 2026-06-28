@@ -83,15 +83,25 @@ export function validateSurvey(
 
     // Percentage group sum check — must total exactly 100%
     if (section.type === 'percentage_group') {
-      const sum = section.fields.reduce((acc, field) => {
-        const val = data[field.key];
-        if (!val) return acc;
-        const num = Number(String(val).replace(/%/g, ''));
-        return acc + (isNaN(num) ? 0 : num);
-      }, 0);
+      const sum = section.fields
+        .filter((f) => f.type === 'percent')
+        .reduce((acc, field) => {
+          const val = data[field.key];
+          if (!val) return acc;
+          const num = Number(String(val).replace(/%/g, ''));
+          return acc + (isNaN(num) ? 0 : num);
+        }, 0);
 
       if (sum > 0 && sum !== 100) {
         errors['_percentage_group'] = `Market segments total ${sum}%. They must add up to exactly 100%.`;
+      }
+    }
+
+    // Disciplines group: at least one checkbox must be true
+    if (section.type === 'disciplines_group') {
+      const anyChecked = section.fields.some((field) => !!data[field.key]);
+      if (!anyChecked) {
+        errors['_disciplines_group'] = 'Select at least one discipline.';
       }
     }
   }

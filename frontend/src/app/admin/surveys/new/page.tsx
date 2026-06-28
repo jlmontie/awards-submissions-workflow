@@ -21,20 +21,25 @@ export default function NewSurveyPage() {
     status: string;
   } | null>(null);
 
+  function defaultName(tid: string, y: number): string {
+    switch (tid) {
+      case 'architects':
+        return `${y} Top Utah Architects Survey`;
+      case 'contractors':
+        return `${y} Top Utah General Contractor Rankings Survey`;
+      default:
+        return `${y} Survey`;
+    }
+  }
+
   function handleTemplateChange(tid: string) {
     setTemplateId(tid);
-    const templateNames: Record<string, string> = {
-      architects: `${year} Top Utah Architects Survey`,
-    };
-    setName(templateNames[tid] || `${year} Survey`);
+    setName(defaultName(tid, year));
   }
 
   function handleYearChange(y: number) {
     setYear(y);
-    const templateNames: Record<string, string> = {
-      architects: `${y} Top Utah Architects Survey`,
-    };
-    setName(templateNames[templateId] || `${y} Survey`);
+    setName(defaultName(templateId, y));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,6 +117,7 @@ export default function NewSurveyPage() {
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm px-3 py-2 border"
               >
                 <option value="architects">Architects</option>
+                <option value="contractors">Contractors</option>
               </select>
             </div>
 
