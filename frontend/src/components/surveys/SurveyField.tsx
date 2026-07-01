@@ -8,19 +8,26 @@ interface SurveyFieldProps {
   error?: string;
   onChange: (key: string, value: string | boolean) => void;
   disabled?: boolean;
+  /**
+   * When set, a checkbox field renders as a radio button belonging to this
+   * named group, giving single-select semantics (e.g. Disciplines).
+   */
+  radioGroup?: string;
 }
 
-export default function SurveyField({ field, value, error, onChange, disabled }: SurveyFieldProps) {
+export default function SurveyField({ field, value, error, onChange, disabled, radioGroup }: SurveyFieldProps) {
   if (field.type === 'checkbox') {
+    const isRadio = !!radioGroup;
     return (
       <div className="flex items-center gap-3">
         <input
-          type="checkbox"
+          type={isRadio ? 'radio' : 'checkbox'}
+          name={isRadio ? radioGroup : undefined}
           id={field.key}
           checked={!!value}
           onChange={(e) => onChange(field.key, e.target.checked)}
           disabled={disabled}
-          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+          className={`h-4 w-4 border-gray-300 text-amber-600 focus:ring-amber-500 ${isRadio ? '' : 'rounded'}`}
         />
         <label htmlFor={field.key} className="text-sm font-medium text-gray-700">
           {field.label}
