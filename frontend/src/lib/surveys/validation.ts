@@ -97,11 +97,11 @@ export function validateSurvey(
       }
     }
 
-    // Disciplines group: at least one checkbox must be true
+    // Disciplines group: exactly one discipline must be selected
     if (section.type === 'disciplines_group') {
       const anyChecked = section.fields.some((field) => !!data[field.key]);
       if (!anyChecked) {
-        errors['_disciplines_group'] = 'Select at least one discipline.';
+        errors['_disciplines_group'] = 'Select one discipline.';
       }
     }
   }

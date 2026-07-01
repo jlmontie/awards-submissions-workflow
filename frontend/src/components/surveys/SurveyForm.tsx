@@ -84,7 +84,22 @@ export default function SurveyForm({
   }, [section, data]);
 
   function handleChange(key: string, value: string | boolean) {
-    setData((prev) => ({ ...prev, [key]: value }));
+    setData((prev) => {
+      const next = { ...prev, [key]: value };
+      // Single-select disciplines group: selecting one discipline clears the
+      // others so exactly one of the (still separate) boolean columns is true.
+      if (value === true) {
+        const group = template.sections.find(
+          (s) => s.type === 'disciplines_group' && s.fields.some((f) => f.key === key),
+        );
+        if (group) {
+          for (const f of group.fields) {
+            if (f.key !== key) next[f.key] = false;
+          }
+        }
+      }
+      return next;
+    });
     // Clear error on change
     if (errors[key]) {
       setErrors((prev) => {
@@ -159,11 +174,11 @@ export default function SurveyForm({
       }
     }
 
-    // Disciplines group: at least one checkbox must be true
+    // Disciplines group: exactly one discipline must be selected
     if (section.type === 'disciplines_group') {
       const anyChecked = section.fields.some((field) => !!data[field.key]);
       if (!anyChecked) {
-        sectionErrors['_disciplines_group'] = 'Select at least one discipline.';
+        sectionErrors['_disciplines_group'] = 'Select one discipline.';
       }
     }
 
@@ -492,6 +507,7 @@ export default function SurveyForm({
                 error={errors[field.key]}
                 onChange={handleChange}
                 disabled={submitStatus === 'submitting'}
+                radioGroup={section.type === 'disciplines_group' ? 'discipline' : undefined}
               />
             </div>
           );
