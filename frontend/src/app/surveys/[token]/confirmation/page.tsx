@@ -65,10 +65,21 @@ export default function SurveyConfirmationPage() {
             <em>Utah Construction + Design</em>.
           </p>
 
+          <p className="mt-4 text-sm text-gray-500">
+            We&rsquo;ve emailed a copy of {wasEdit ? 'your updated submission' : 'this submission'} to
+            your firm&rsquo;s contacts for your records. You can also download a PDF copy below.
+          </p>
+
           <div className="mt-8 flex flex-col items-center gap-3">
+            <a
+              href={`/api/surveys/responses/pdf?token=${token}`}
+              className="inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 transition-colors"
+            >
+              Download PDF Copy
+            </a>
             <Link
               href={`/surveys/${token}`}
-              className="inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-md hover:bg-amber-700 transition-colors"
+              className="inline-flex items-center justify-center px-6 py-2.5 text-sm font-medium text-amber-700 bg-white border border-amber-600 rounded-md hover:bg-amber-50 transition-colors"
             >
               Edit Your Submission
             </Link>

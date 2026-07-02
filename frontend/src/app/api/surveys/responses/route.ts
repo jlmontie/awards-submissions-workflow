@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
 import { surveyTemplates, normalizeSubmission } from '@/lib/surveys/templates';
-import { responseTabFor, SURVEYS_TAB, SURVEY_RECIPIENTS_TAB } from '@/lib/surveys/sheets';
+import {
+  responseTabFor,
+  SURVEYS_TAB,
+  SURVEY_RECIPIENTS_TAB,
+  SURVEY_CONTACTS_TAB,
+} from '@/lib/surveys/sheets';
+import { buildSubmissionSummary } from '@/lib/surveys/summary';
+import { generateSubmissionPdf } from '@/lib/surveys/pdf';
+import { sendSubmissionCopyEmails } from '@/lib/surveys/submission-email';
+import { activeFirmContacts } from '@/lib/surveys/contacts';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -49,6 +58,7 @@ export async function POST(request: NextRequest) {
     const tokenCol = recipientHeaders.indexOf('token');
     const surveyIdCol = recipientHeaders.indexOf('survey_id');
     const recipientIdCol = recipientHeaders.indexOf('recipient_id');
+    const firmNameCol = recipientHeaders.indexOf('firm_name');
     const statusCol = recipientHeaders.indexOf('status');
 
     let recipientRowIndex = -1;
@@ -69,6 +79,7 @@ export async function POST(request: NextRequest) {
 
     const surveyId = recipientRow[surveyIdCol];
     const recipientId = recipientRow[recipientIdCol];
+    const firmName = firmNameCol !== -1 ? (recipientRow[firmNameCol] || '').trim() : '';
     const now = new Date().toISOString();
 
     // 2. Look up survey row to determine template (and which response tab)
@@ -83,12 +94,21 @@ export async function POST(request: NextRequest) {
     const sHeaders = surveyRows[0];
     const sIdCol = sHeaders.indexOf('survey_id');
     const sTemplateCol = sHeaders.indexOf('template_id');
+    const sNameCol = sHeaders.indexOf('name');
+    const sYearCol = sHeaders.indexOf('year');
+    const sCategoryCol = sHeaders.indexOf('category');
     const surveyRow = surveyRows.slice(1).find((r) => r[sIdCol] === surveyId);
     if (!surveyRow) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
     const templateId =
       (sTemplateCol !== -1 ? surveyRow[sTemplateCol] : '') || 'architects';
+    const surveyName = (sNameCol !== -1 ? surveyRow[sNameCol] : '') || 'Survey';
+    const surveyYear = parseInt(
+      (sYearCol !== -1 ? surveyRow[sYearCol] : '') || String(new Date().getFullYear()),
+      10,
+    );
+    const surveyCategory = (sCategoryCol !== -1 ? surveyRow[sCategoryCol] : '') || '';
 
     let responseTab: string;
     try {
@@ -187,6 +207,52 @@ export async function POST(request: NextRequest) {
             },
           });
         }
+      }
+    }
+
+    // 8. Best-effort: email a copy of the submission (with a PDF attachment) to
+    // every active contact at the firm. Never block or fail the submission on
+    // email — the response is already saved by this point.
+    if (template) {
+      try {
+        const contactsRes = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `${SURVEY_CONTACTS_TAB}!A:Z`,
+        });
+        const contacts = activeFirmContacts(
+          contactsRes.data.values || [],
+          firmName,
+          surveyCategory,
+        );
+
+        if (contacts.length > 0) {
+          const summaryData = normalized as Record<string, string | boolean>;
+          const sections = buildSubmissionSummary(template, summaryData, surveyYear);
+          const pdf = await generateSubmissionPdf({
+            surveyName,
+            firmName,
+            submittedAt: now,
+            wasEdit: isEditingExisting,
+            sections,
+          });
+          const result = await sendSubmissionCopyEmails(
+            contacts,
+            { surveyName, firmName, submittedAt: now, wasEdit: isEditingExisting, sections },
+            pdf,
+          );
+          console.log(
+            `[responses] Submission copy emailed: firm="${firmName}" sent=${result.sent} skipped=${result.skipped} errors=${result.errors.length}`,
+          );
+        } else {
+          console.warn(
+            `[responses] No active contacts for firm "${firmName}" — no submission copy sent`,
+          );
+        }
+      } catch (emailErr: any) {
+        console.error(
+          '[responses] Failed to send submission copy email (non-fatal):',
+          emailErr?.message,
+        );
       }
     }
 
