@@ -6,11 +6,15 @@ const nextConfig = {
   // Increase static page generation timeout for API routes during build
   staticPageGenerationTimeout: 120, // seconds
 
-  // pdfkit reads its standard-font metric files (*.afm) from disk at runtime.
-  // Next's standalone output tracing doesn't detect these dynamic reads, so the
-  // routes that generate submission PDFs would crash in production. Force the
-  // data directory to be bundled alongside those routes.
   experimental: {
+    // pdfkit reads its standard-font metric files (*.afm) via
+    // `__dirname + '/data/<font>.afm'` at runtime. If webpack bundles pdfkit
+    // into the route chunk, `__dirname` resolves to `.next/server/chunks` and
+    // those reads fail (ENOENT), crashing PDF generation. Keep pdfkit external
+    // so it's required from node_modules and `__dirname` stays valid.
+    serverComponentsExternalPackages: ['pdfkit'],
+    // Belt-and-suspenders for the standalone (Docker) output: ensure the font
+    // data directory is copied even though the reads are dynamic.
     outputFileTracingIncludes: {
       '/api/surveys/responses/**': ['./node_modules/pdfkit/js/data/**/*'],
     },
