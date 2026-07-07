@@ -54,6 +54,19 @@ export default function SurveyField({ field, value, error, onChange, disabled, r
           id={field.key}
           value={typeof value === 'boolean' ? '' : value || ''}
           onChange={(e) => onChange(field.key, e.target.value)}
+          onBlur={
+            field.type === 'currency'
+              ? (e) => {
+                  // Auto-complete the two decimal places when the user leaves
+                  // the field: "250" -> "250.00", "47.5" -> "47.50". Leave
+                  // non-numeric input untouched so validation can flag it.
+                  const cleaned = e.target.value.replace(/[$,]/g, '').trim();
+                  if (!cleaned || !/^\d+(\.\d*)?$|^\.\d+$/.test(cleaned)) return;
+                  const formatted = Number(cleaned).toFixed(2);
+                  if (formatted !== e.target.value) onChange(field.key, formatted);
+                }
+              : undefined
+          }
           disabled={disabled}
           placeholder={field.placeholder}
           {...(field.type === 'percent'

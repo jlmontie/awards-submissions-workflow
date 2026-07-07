@@ -150,7 +150,7 @@ export default function SurveyForm({
           } else if (strValue && num > 10000) {
             sectionErrors[field.key] = 'Enter revenue in millions (e.g., 47.50, not 47,500,000)';
           } else if (strValue && !/^\d+\.\d{2}$/.test(raw)) {
-            sectionErrors[field.key] = 'Enter exactly two decimal places (e.g., 47.50)';
+            sectionErrors[field.key] = 'Enter a number that includes two decimal places (e.g., 47.50 OR 250.00)';
           }
           break;
         }

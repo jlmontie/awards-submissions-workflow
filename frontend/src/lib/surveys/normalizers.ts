@@ -42,6 +42,18 @@ const DIRECTIONALS: Record<string, string> = {
 export const normalizers = {
   trim: (raw: unknown): string => String(raw ?? '').trim(),
 
+  // Revenue is entered in millions to two decimal places — the second decimal
+  // breaks ranking ties at the hundreds-of-thousands place, so stored values
+  // must be consistently two-decimal. Coerce a bare or short number to two
+  // decimals ("250" -> "250.00", "47.5" -> "47.50"); pass non-numeric input
+  // through trimmed so validation still surfaces it. Mirrors the field's
+  // on-blur formatting so drafts, edits, and edge cases land the same way.
+  currency: (raw: unknown): string => {
+    const cleaned = String(raw ?? '').replace(/[$,]/g, '').trim();
+    if (!cleaned || !/^\d+(\.\d*)?$|^\.\d+$/.test(cleaned)) return String(raw ?? '').trim();
+    return Number(cleaned).toFixed(2);
+  },
+
   email: (raw: unknown): string => String(raw ?? '').trim().toLowerCase(),
 
   // Normalize a US state value to its 2-letter postal code. Accepts the
