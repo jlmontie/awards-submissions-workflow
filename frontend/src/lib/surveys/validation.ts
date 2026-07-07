@@ -64,7 +64,7 @@ export function validateSurvey(
           } else if (strValue && !/^\d+\.\d{2}$/.test(raw)) {
             // Two decimal places required so ties at the hundreds-of-K place
             // resolve in the ranking export.
-            errors[field.key] = 'Enter exactly two decimal places (e.g., 47.50)';
+            errors[field.key] = 'Enter a number that includes two decimal places (e.g., 47.50 OR 250.00)';
           }
           break;
         }
