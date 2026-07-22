@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import type { SurveyTemplate } from '@/lib/surveys/templates';
 import { resolveLabel } from '@/lib/surveys/templates';
-import { validateSurvey } from '@/lib/surveys/validation';
+import { validateSurvey, validateField } from '@/lib/surveys/validation';
 import SurveyField from './SurveyField';
 import SurveyProgress from './SurveyProgress';
 
@@ -114,56 +114,12 @@ export default function SurveyForm({
     const sectionErrors: Record<string, string> = {};
 
     for (const field of section.fields) {
-      const value = data[field.key];
-
       // Skip hidden fields
       if (field.hideWhen && data[field.hideWhen]) continue;
 
-      if (field.required && !value) {
-        sectionErrors[field.key] = 'This field is required';
-        continue;
-      }
-
-      if (!value) continue;
-      const strValue = String(value).trim();
-      if (field.required && strValue === '') {
-        sectionErrors[field.key] = 'This field is required';
-        continue;
-      }
-
-      switch (field.type) {
-        case 'email':
-          if (strValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(strValue)) {
-            sectionErrors[field.key] = 'Enter a valid email address';
-          }
-          break;
-        case 'number':
-          if (strValue && isNaN(Number(strValue))) {
-            sectionErrors[field.key] = 'Enter a valid number';
-          }
-          break;
-        case 'currency': {
-          const raw = strValue.replace(/[$,]/g, '');
-          const num = Number(raw);
-          if (strValue && isNaN(num)) {
-            sectionErrors[field.key] = 'Enter a valid dollar amount';
-          } else if (strValue && num > 100000) {
-            sectionErrors[field.key] = 'Enter revenue in millions (e.g., 47.50, not 47,500,000)';
-          } else if (strValue && !/^\d+\.\d{2}$/.test(raw)) {
-            sectionErrors[field.key] = 'Enter a number that includes two decimal places (e.g., 47.50 OR 250.00)';
-          }
-          break;
-        }
-        case 'percent':
-          if (strValue) {
-            const num = Number(strValue.replace(/%/g, ''));
-            if (isNaN(num) || num < 0 || num > 100) {
-              sectionErrors[field.key] = 'Enter a value between 0 and 100';
-            } else if (!Number.isInteger(num)) {
-              sectionErrors[field.key] = 'Enter a whole number (no decimals)';
-            }
-          }
-          break;
+      const error = validateField(field, data[field.key]);
+      if (error) {
+        sectionErrors[field.key] = error;
       }
     }
 
