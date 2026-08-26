@@ -333,6 +333,7 @@ function architectResponseRow({ responseId, surveyId, recipientId, token, now, d
     data.other_segment_name,
     // Appended after `other_segment_name` to keep every existing column at its
     // current position — see the note on the *_RESPONSE_COLUMNS constants.
+    data.pct_data_centers,
   ].map(stringify);
 }
 
@@ -385,6 +386,7 @@ function engineerResponseRow({ responseId, surveyId, recipientId, token, now, da
     data.other_segment_name,
     // Appended after `other_segment_name` to keep every existing column at its
     // current position — see the note on the *_RESPONSE_COLUMNS constants.
+    data.pct_data_centers,
   ].map(stringify);
 }
 
@@ -446,6 +448,7 @@ function contractorResponseRow({ responseId, surveyId, recipientId, token, now, 
     data.other_segment_name,
     // Appended after `other_segment_name` to keep every existing column at its
     // current position — see the note on the *_RESPONSE_COLUMNS constants.
+    data.pct_data_centers,
   ].map(stringify);
 }
 

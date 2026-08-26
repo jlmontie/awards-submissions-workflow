@@ -4,6 +4,13 @@ The survey subsystem stores responses in one Google Sheet tab **per survey templ
 
 Tab names are defined once in [frontend/src/lib/surveys/sheets.ts](../../frontend/src/lib/surveys/sheets.ts) (`RESPONSE_TABS`). The responses route picks the destination tab from the survey's `template_id`; the export route reads from the same map.
 
+> **Adding a column.** New columns go on the **end** of a template's list, not
+> beside related ones. The row writer emits values positionally, so a mid-list
+> insert would shift every later column of the sheets already holding responses.
+> `pct_data_centers` is the current example: it reads as just another market
+> segment in the form, but lands after `other_segment_name` on all three sheets.
+> Order in the form is independent of order here.
+
 ## `Survey Responses - Architects`
 
 Architect survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `architectResponseRow`) emits these 43 columns in this exact order. The first row of the sheet should mirror the headers below; if the header row is shorter than expected, the parser falls back to positional names from this list (defined as `ARCHITECT_RESPONSE_COLUMNS` in [export/architects.ts](../../frontend/src/lib/surveys/export/architects.ts)).
@@ -52,10 +59,12 @@ Architect survey responses. The response writer ([responses/route.ts](../../fron
 | 39 | AN | `pct_industrial` | |
 | 40 | AO | `pct_other` | |
 | 41 | AP | `other_segment_name` | User-supplied label for the `pct_other` segment |
+| 42 | AQ | `pct_data_centers` | Appended after `other_segment_name` — see note below |
+
 
 ## `Survey Responses - Contractors`
 
-Contractor survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `contractorResponseRow`) emits these 53 columns in this exact order. Fallback list defined as `CONTRACTOR_RESPONSE_COLUMNS` in [export/contractors.ts](../../frontend/src/lib/surveys/export/contractors.ts).
+Contractor survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `contractorResponseRow`) emits these 55 columns in this exact order. Fallback list defined as `CONTRACTOR_RESPONSE_COLUMNS` in [export/contractors.ts](../../frontend/src/lib/surveys/export/contractors.ts).
 
 | Pos | Col | Header | Notes |
 |----:|-----|--------|-------|
@@ -113,10 +122,12 @@ Contractor survey responses. The response writer ([responses/route.ts](../../fro
 | 51 | AZ | `pct_power` | |
 | 52 | BA | `pct_other` | |
 | 53 | BB | `other_segment_name` | User-supplied label for the `pct_other` segment |
+| 54 | BC | `pct_data_centers` | Appended after `other_segment_name` — see note below |
+
 
 ## `Survey Responses - Engineers`
 
-Engineering firm survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `engineerResponseRow`) emits these 45 columns in this exact order. Fallback list defined as `ENGINEER_RESPONSE_COLUMNS` in [export/engineers.ts](../../frontend/src/lib/surveys/export/engineers.ts).
+Engineering firm survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `engineerResponseRow`) emits these 46 columns in this exact order. Fallback list defined as `ENGINEER_RESPONSE_COLUMNS` in [export/engineers.ts](../../frontend/src/lib/surveys/export/engineers.ts).
 
 The schema mirrors the architect one — same general info, revenue, and project fields — minus `num_licensed_architects` / `num_leed_ap`, plus five infrastructure market segments (`pct_highway`, `pct_underground`, `pct_telecomm`, `pct_water`, `pct_wastewater`).
 
@@ -167,6 +178,8 @@ The schema mirrors the architect one — same general info, revenue, and project
 | 42 | AQ | `pct_wastewater` |  |
 | 43 | AR | `pct_other` |  |
 | 44 | AS | `other_segment_name` | User-supplied label for the `pct_other` segment |
+| 45 | AT | `pct_data_centers` | Appended after `other_segment_name` — see note below |
+
 
 ## `Survey Contacts`
 

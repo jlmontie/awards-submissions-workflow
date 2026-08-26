@@ -15,9 +15,11 @@ import {
   type ExportResult,
   type ExportSection,
   type Firm,
+  formatCount,
   formatPct,
   formatPhone,
   formatRevenue,
+  formatWebsite,
   isTrue,
   joinProjectAndLocation,
   normalizeState,
@@ -30,6 +32,10 @@ import {
   wrapRtf,
 } from './shared';
 
+// `pct_data_centers` is appended after `other_segment_name` rather than slotted
+// in beside the other segments: the row writer is positional, so a mid-list
+// insert would shift every later column of the sheets already holding
+// responses. Form order is independent of column order.
 export const ARCHITECT_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'location', 'year_founded', 'top_executive',
@@ -43,6 +49,7 @@ export const ARCHITECT_RESPONSE_COLUMNS = [
   'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
   'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
   'other_segment_name',
+  'pct_data_centers',
 ];
 
 const MARKET_DISPLAY_NAMES: Record<string, string> = {
@@ -56,6 +63,7 @@ const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_commercial_retail: 'Comm/Retail',
   pct_sports_rec: 'Sports/Rec',
   pct_industrial: 'Industrial',
+  pct_data_centers: 'Data Centers',
   pct_other: 'Other',
 };
 
@@ -117,14 +125,14 @@ function firmCells(firm: Firm): string[][] {
   return [
     [firm.firm_name || '', formatPhone(firm.phone), firm.year_founded || '',
      firm.top_executive || '', completedProject,
-     firm.num_employees || '', revCurrent, revPrior1, revPrior2,
+     formatCount(firm.num_employees), revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
-    [firm.address || '', firm.website || '', '',
+    [firm.address || '', formatWebsite(firm.website), '',
      firm.top_executive_title || '', upcomingProject,
-     firm.num_licensed_architects || '', '', '', '',
+     formatCount(firm.num_licensed_architects), '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', '', firm.years_at_firm || '', '',
-     firm.num_leed_ap || '', '', '', '',
+     formatCount(firm.num_leed_ap), '', '', '',
      topMarkets[2][0], formatPct(topMarkets[2][1])],
   ];
 }

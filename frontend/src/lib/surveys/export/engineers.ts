@@ -19,9 +19,11 @@ import {
   type ExportResult,
   type ExportSection,
   type Firm,
+  formatCount,
   formatPct,
   formatPhone,
   formatRevenue,
+  formatWebsite,
   isTrue,
   joinProjectAndLocation,
   normalizeState,
@@ -37,6 +39,10 @@ import {
  * Column order in the `Survey Responses - Engineers` sheet. Matches the
  * positional output of `engineerResponseRow` in the responses route.
  */
+// `pct_data_centers` is appended after `other_segment_name` rather than slotted
+// in beside the other segments: the row writer is positional, so a mid-list
+// insert would shift every later column of the sheets already holding
+// responses. Form order is independent of column order.
 export const ENGINEER_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'location', 'year_founded', 'top_executive',
@@ -51,6 +57,7 @@ export const ENGINEER_RESPONSE_COLUMNS = [
   'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial',
   'pct_highway', 'pct_underground', 'pct_telecomm', 'pct_water',
   'pct_wastewater', 'pct_other', 'other_segment_name',
+  'pct_data_centers',
 ];
 
 const MARKET_DISPLAY_NAMES: Record<string, string> = {
@@ -69,6 +76,7 @@ const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_telecomm: 'Telecomm',
   pct_water: 'Water',
   pct_wastewater: 'Wastewater',
+  pct_data_centers: 'Data Centers',
   pct_other: 'Other',
 };
 
@@ -136,9 +144,9 @@ function firmCells(firm: Firm): string[][] {
   return [
     [firm.firm_name || '', formatPhone(firm.phone), firm.year_founded || '',
      firm.top_executive || '', completedProject,
-     firm.num_employees || '', revCurrent, revPrior1, revPrior2,
+     formatCount(firm.num_employees), revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
-    [firm.address || '', firm.website || '', '',
+    [firm.address || '', formatWebsite(firm.website), '',
      firm.top_executive_title || '', upcomingProject,
      '', '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
