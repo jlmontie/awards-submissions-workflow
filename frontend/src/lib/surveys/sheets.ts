@@ -15,6 +15,7 @@ export const SURVEY_CONTACTS_TAB = 'Survey Contacts';
 export const RESPONSE_TABS: Record<string, string> = {
   architects: 'Survey Responses - Architects',
   contractors: 'Survey Responses - Contractors',
+  engineers: 'Survey Responses - Engineers',
 };
 
 export function responseTabFor(templateId: string): string {

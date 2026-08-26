@@ -279,6 +279,8 @@ function buildResponseRow(templateId: string, ctx: RowContext): string[] {
   switch (templateId) {
     case 'contractors':
       return contractorResponseRow(ctx);
+    case 'engineers':
+      return engineerResponseRow(ctx);
     case 'architects':
     default:
       return architectResponseRow(ctx);
@@ -329,6 +331,60 @@ function architectResponseRow({ responseId, surveyId, recipientId, token, now, d
     data.pct_industrial,
     data.pct_other,
     data.other_segment_name,
+    // Appended after `other_segment_name` to keep every existing column at its
+    // current position — see the note on the *_RESPONSE_COLUMNS constants.
+  ].map(stringify);
+}
+
+function engineerResponseRow({ responseId, surveyId, recipientId, token, now, data }: RowContext): string[] {
+  return [
+    responseId,
+    surveyId,
+    recipientId,
+    token,
+    now,
+    data.firm_name,
+    data.location,
+    data.year_founded,
+    data.top_executive,
+    data.top_executive_title,
+    data.years_at_firm,
+    data.address,
+    data.city,
+    data.state,
+    data.zip,
+    data.phone,
+    data.marketing_email,
+    data.website,
+    data.other_locations,
+    data.num_employees,
+    data.revenue_current,
+    data.revenue_prior_1,
+    data.revenue_prior_2,
+    data.revenue_dnd,
+    data.largest_project_completed,
+    data.largest_project_completed_location,
+    data.largest_project_upcoming,
+    data.largest_project_upcoming_location,
+    data.pct_k12,
+    data.pct_higher_ed,
+    data.pct_civic,
+    data.pct_healthcare,
+    data.pct_office,
+    data.pct_resort_hospitality,
+    data.pct_multi_family,
+    data.pct_commercial_retail,
+    data.pct_sports_rec,
+    data.pct_industrial,
+    data.pct_highway,
+    data.pct_underground,
+    data.pct_telecomm,
+    data.pct_water,
+    data.pct_wastewater,
+    data.pct_other,
+    data.other_segment_name,
+    // Appended after `other_segment_name` to keep every existing column at its
+    // current position — see the note on the *_RESPONSE_COLUMNS constants.
   ].map(stringify);
 }
 
@@ -388,6 +444,8 @@ function contractorResponseRow({ responseId, surveyId, recipientId, token, now, 
     data.pct_power,
     data.pct_other,
     data.other_segment_name,
+    // Appended after `other_segment_name` to keep every existing column at its
+    // current position — see the note on the *_RESPONSE_COLUMNS constants.
   ].map(stringify);
 }
 

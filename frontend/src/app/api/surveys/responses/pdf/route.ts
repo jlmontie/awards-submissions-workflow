@@ -8,14 +8,21 @@ import { generateSubmissionPdf } from '@/lib/surveys/pdf';
 import { submissionPdfFilename } from '@/lib/surveys/submission-email';
 import { ARCHITECT_RESPONSE_COLUMNS } from '@/lib/surveys/export/architects';
 import { CONTRACTOR_RESPONSE_COLUMNS } from '@/lib/surveys/export/contractors';
+import { ENGINEER_RESPONSE_COLUMNS } from '@/lib/surveys/export/engineers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 function fallbackColumnsFor(templateId: string): string[] {
-  return templateId === 'contractors'
-    ? CONTRACTOR_RESPONSE_COLUMNS
-    : ARCHITECT_RESPONSE_COLUMNS;
+  switch (templateId) {
+    case 'contractors':
+      return CONTRACTOR_RESPONSE_COLUMNS;
+    case 'engineers':
+      return ENGINEER_RESPONSE_COLUMNS;
+    case 'architects':
+    default:
+      return ARCHITECT_RESPONSE_COLUMNS;
+  }
 }
 
 /**

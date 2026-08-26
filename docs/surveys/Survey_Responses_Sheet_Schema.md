@@ -114,9 +114,63 @@ Contractor survey responses. The response writer ([responses/route.ts](../../fro
 | 52 | BA | `pct_other` | |
 | 53 | BB | `other_segment_name` | User-supplied label for the `pct_other` segment |
 
+## `Survey Responses - Engineers`
+
+Engineering firm survey responses. The response writer ([responses/route.ts](../../frontend/src/app/api/surveys/responses/route.ts) `engineerResponseRow`) emits these 45 columns in this exact order. Fallback list defined as `ENGINEER_RESPONSE_COLUMNS` in [export/engineers.ts](../../frontend/src/lib/surveys/export/engineers.ts).
+
+The schema mirrors the architect one — same general info, revenue, and project fields — minus `num_licensed_architects` / `num_leed_ap`, plus five infrastructure market segments (`pct_highway`, `pct_underground`, `pct_telecomm`, `pct_water`, `pct_wastewater`).
+
+| Pos | Col | Header | Notes |
+|----:|-----|--------|-------|
+| 0 | A | `response_id` |  |
+| 1 | B | `survey_id` |  |
+| 2 | C | `recipient_id` |  |
+| 3 | D | `token` |  |
+| 4 | E | `submitted_at` | ISO timestamp |
+| 5 | F | `firm_name` |  |
+| 6 | G | `location` |  |
+| 7 | H | `year_founded` |  |
+| 8 | I | `top_executive` |  |
+| 9 | J | `top_executive_title` |  |
+| 10 | K | `years_at_firm` |  |
+| 11 | L | `address` |  |
+| 12 | M | `city` |  |
+| 13 | N | `state` | Drives the Utah / out-of-state export split |
+| 14 | O | `zip` |  |
+| 15 | P | `phone` |  |
+| 16 | Q | `marketing_email` |  |
+| 17 | R | `website` |  |
+| 18 | S | `other_locations` |  |
+| 19 | T | `num_employees` |  |
+| 20 | U | `revenue_current` |  |
+| 21 | V | `revenue_prior_1` |  |
+| 22 | W | `revenue_prior_2` |  |
+| 23 | X | `revenue_dnd` | `TRUE` / `FALSE` — hides all 3 revenue cells, ranks by employees |
+| 24 | Y | `largest_project_completed` |  |
+| 25 | Z | `largest_project_completed_location` |  |
+| 26 | AA | `largest_project_upcoming` |  |
+| 27 | AB | `largest_project_upcoming_location` |  |
+| 28 | AC | `pct_k12` |  |
+| 29 | AD | `pct_higher_ed` |  |
+| 30 | AE | `pct_civic` |  |
+| 31 | AF | `pct_healthcare` |  |
+| 32 | AG | `pct_office` |  |
+| 33 | AH | `pct_resort_hospitality` |  |
+| 34 | AI | `pct_multi_family` |  |
+| 35 | AJ | `pct_commercial_retail` |  |
+| 36 | AK | `pct_sports_rec` |  |
+| 37 | AL | `pct_industrial` |  |
+| 38 | AM | `pct_highway` |  |
+| 39 | AN | `pct_underground` |  |
+| 40 | AO | `pct_telecomm` |  |
+| 41 | AP | `pct_water` |  |
+| 42 | AQ | `pct_wastewater` |  |
+| 43 | AR | `pct_other` |  |
+| 44 | AS | `other_segment_name` | User-supplied label for the `pct_other` segment |
+
 ## `Survey Contacts`
 
-No schema change. To start receiving contractor responses, add rows with `category` set to `contractors` and `active` set to `TRUE`. The recipient-import flow filters by survey category.
+No schema change. To start receiving responses for a template, add rows with `category` set to that template id (`contractors`, `engineers`, ...) and `active` set to `TRUE`. The recipient-import flow filters by survey category.
 
 ## Adding a new template
 

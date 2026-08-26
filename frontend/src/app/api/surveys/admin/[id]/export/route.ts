@@ -19,9 +19,9 @@ export const runtime = 'nodejs';
  *   ?section=KEY   → just that section as a downloadable .rtf
  *   (default)      → first section as a downloadable .rtf
  *
- * Sections returned depend on the survey's template: architects yield up to
- * Utah + Out-of-State; contractors yield up to GC Overall + Out-of-State +
- * General Builders + Heavy/Highway & Muni/Utility.
+ * Sections returned depend on the survey's template: architects and engineers
+ * yield up to Utah + Out-of-State; contractors yield up to GC Overall +
+ * Out-of-State + General Builders + Heavy/Highway & Muni/Utility.
  */
 export async function GET(
   request: NextRequest,

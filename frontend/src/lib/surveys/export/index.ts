@@ -1,6 +1,7 @@
 import type { ExportResult, Firm } from './shared';
 import { generateArchitectExport, rowsToArchitectFirms } from './architects';
 import { generateContractorExport, rowsToContractorFirms } from './contractors';
+import { generateEngineerExport, rowsToEngineerFirms } from './engineers';
 
 export type { ExportResult, ExportSection, Firm } from './shared';
 
@@ -18,6 +19,8 @@ export function generateExport(
   switch (templateId) {
     case 'contractors':
       return generateContractorExport(responses, surveyYear);
+    case 'engineers':
+      return generateEngineerExport(responses, surveyYear);
     case 'architects':
     default:
       return generateArchitectExport(responses, surveyYear);
@@ -28,6 +31,8 @@ function parseRows(templateId: string, rows: string[][]): Firm[] {
   switch (templateId) {
     case 'contractors':
       return rowsToContractorFirms(rows);
+    case 'engineers':
+      return rowsToEngineerFirms(rows);
     case 'architects':
     default:
       return rowsToArchitectFirms(rows);

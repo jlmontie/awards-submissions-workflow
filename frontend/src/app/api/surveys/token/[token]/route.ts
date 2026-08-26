@@ -8,6 +8,7 @@ import {
 } from '@/lib/surveys/sheets';
 import { ARCHITECT_RESPONSE_COLUMNS } from '@/lib/surveys/export/architects';
 import { CONTRACTOR_RESPONSE_COLUMNS } from '@/lib/surveys/export/contractors';
+import { ENGINEER_RESPONSE_COLUMNS } from '@/lib/surveys/export/engineers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -49,6 +50,8 @@ function fallbackColumnsFor(templateId: string): string[] {
   switch (templateId) {
     case 'contractors':
       return CONTRACTOR_RESPONSE_COLUMNS;
+    case 'engineers':
+      return ENGINEER_RESPONSE_COLUMNS;
     case 'architects':
     default:
       return ARCHITECT_RESPONSE_COLUMNS;
