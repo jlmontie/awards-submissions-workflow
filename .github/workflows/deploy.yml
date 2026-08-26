@@ -3,6 +3,14 @@ name: Deploy to Cloud Run
 on:
   push:
     branches: [main]
+  # Manual trigger, from the Actions tab or `gh workflow run deploy.yml`.
+  # A push event Actions never receives — during an Actions outage, say —
+  # creates no run, and one is not backfilled once the incident clears, so
+  # main sits deployed-behind with no way to retry short of an empty commit.
+  # Dispatch redeploys the selected ref: `github.sha` resolves to that ref's
+  # head, so the image tags and the deployed revision line up exactly as they
+  # do on a push.
+  workflow_dispatch:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
