@@ -4,6 +4,17 @@ import { getSheetsClient } from '@/lib/google-sheets';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+/**
+ * Survey ID prefix per template. Templates without an entry fall back to the
+ * first four letters of the template id uppercased, which is how `contractors`
+ * became `CONT` before this map existed.
+ */
+const SURVEY_ID_PREFIXES: Record<string, string> = {
+  architects: 'ARCH',
+  contractors: 'CONT',
+  engineers: 'ENGR',
+};
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -33,7 +44,7 @@ export async function POST(request: NextRequest) {
     // per (template, year), so a collision is almost always the admin
     // re-clicking "New Survey" instead of opening the existing draft.
     // For testing, use a fictitious year to keep IDs unique.
-    const prefix = templateId === 'architects' ? 'ARCH' : templateId.toUpperCase().slice(0, 4);
+    const prefix = SURVEY_ID_PREFIXES[templateId] || templateId.toUpperCase().slice(0, 4);
     const surveyId = `${prefix}-${year}`;
 
     const existingRes = await sheets.spreadsheets.values.get({

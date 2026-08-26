@@ -27,6 +27,8 @@ export default function NewSurveyPage() {
         return `${y} Top Utah Architects Survey`;
       case 'contractors':
         return `${y} Top Utah General Contractor Rankings Survey`;
+      case 'engineers':
+        return `${y} Top Utah Engineering Firms Survey`;
       default:
         return `${y} Survey`;
     }
@@ -118,6 +120,7 @@ export default function NewSurveyPage() {
               >
                 <option value="architects">Architects</option>
                 <option value="contractors">Contractors</option>
+                <option value="engineers">Engineers</option>
               </select>
             </div>
 

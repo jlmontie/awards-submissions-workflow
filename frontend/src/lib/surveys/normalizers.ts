@@ -56,6 +56,29 @@ export const normalizers = {
 
   email: (raw: unknown): string => String(raw ?? '').trim().toLowerCase(),
 
+  // Print style for a website is the bare domain: 'https://www.Okland.com/'
+  // sets as 'okland.com'. Drop the scheme, a leading 'www.', and any trailing
+  // slash, and lowercase the host. A path is kept as typed (only the host is
+  // case-insensitive) so a deep link still resolves if one ever shows up.
+  //
+  // Unlike its siblings this one runs at *export* time only (via
+  // `formatWebsite`), not at write-time: submitted responses are prefilled
+  // back into the form for editing, and a bare domain fails the native
+  // validation on the `type="url"` input it would land in. The sheet keeps
+  // whatever the firm typed; only the printed list is tidied.
+  website: (raw: unknown): string => {
+    const trimmed = String(raw ?? '').trim();
+    if (!trimmed) return '';
+    const bare = trimmed
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .replace(/^www\./i, '');
+    const slash = bare.indexOf('/');
+    if (slash === -1) return bare.toLowerCase();
+    const host = bare.slice(0, slash).toLowerCase();
+    const path = bare.slice(slash).replace(/\/+$/, '');
+    return `${host}${path}`;
+  },
+
   // Normalize a US state value to its 2-letter postal code. Accepts the
   // code already ('ut', 'UT '), the full name ('Utah', 'CALIFORNIA'), or
   // anything else (returned trimmed + uppercased so the export's state

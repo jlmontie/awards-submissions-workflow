@@ -51,12 +51,37 @@ export function isTrue(value: string | undefined): boolean {
   return String(value || '').trim().toUpperCase() === 'TRUE';
 }
 
+/**
+ * Insert thousands separators into the integer part of an already-formatted
+ * numeric string ('1000.0' -> '1,000.0'). Split out from the formatters below
+ * so revenue and headcount group identically.
+ */
+function groupThousands(s: string): string {
+  const [int, frac] = s.split('.');
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return frac === undefined ? grouped : `${grouped}.${frac}`;
+}
+
 export function formatRevenue(value: string | undefined, isDnd: boolean): string {
   if (isDnd) return 'DND';
   if (!value || String(value).trim().toUpperCase() === 'DND') return '';
   const v = parseFloat2(value);
   if (v === 0) return '';
-  return `$${v.toFixed(1)}`;
+  return `$${groupThousands(v.toFixed(1))}`;
+}
+
+/**
+ * Headcount columns (# Employees, # Lic. Archs, # LEED AP) carry the same
+ * thousands separator as revenue, so a 1,500-person firm sets as '1,500'
+ * rather than '1500'. Non-numeric entries pass through trimmed rather than
+ * being blanked — the designer would rather see odd input than lose it.
+ */
+export function formatCount(value: string | undefined): string {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return '';
+  const n = parseInt2(trimmed, NaN);
+  if (isNaN(n)) return trimmed;
+  return groupThousands(String(n));
 }
 
 export function formatPct(value: number): string {
@@ -64,12 +89,26 @@ export function formatPct(value: number): string {
   return '';
 }
 
+/**
+ * Project locations in these lists are Utah cities, so the state token is
+ * redundant in print — 'Lehi, UT' sets as 'Lehi', and a bare 'UT' drops out
+ * entirely. Editorial strips this by hand every year; doing it here means the
+ * export arrives clean. A non-Utah state is left alone, since that one *is*
+ * information worth printing.
+ */
+function stripUtahSuffix(location: string): string {
+  return location
+    .replace(/[,\s]+(UT|UTAH)\.?$/i, '')
+    .replace(/^(UT|UTAH)\.?$/i, '')
+    .trim();
+}
+
 export function joinProjectAndLocation(
   project: string | undefined,
   location: string | undefined,
 ): string {
   const p = (project || '').trim();
-  const l = (location || '').trim();
+  const l = stripUtahSuffix((location || '').trim());
   if (p && l) return `${p} — ${l}`;
   return p || l || '';
 }
@@ -93,6 +132,15 @@ export function normalizeState(raw: string | undefined): string {
  */
 export function formatPhone(raw: string | undefined): string {
   return normalizers.phone(raw);
+}
+
+/**
+ * Re-normalize a website at export time, for the same reason as `formatPhone`:
+ * new submissions arrive bare-domain via the `website` normalizer, but rows
+ * already in the sheet still carry 'https://www.…/' forms.
+ */
+export function formatWebsite(raw: string | undefined): string {
+  return normalizers.website(raw);
 }
 
 /**

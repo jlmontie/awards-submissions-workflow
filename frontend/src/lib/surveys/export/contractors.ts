@@ -20,9 +20,11 @@ import {
   type ExportResult,
   type ExportSection,
   type Firm,
+  formatCount,
   formatPct,
   formatPhone,
   formatRevenue,
+  formatWebsite,
   isTrue,
   joinProjectAndLocation,
   normalizeState,
@@ -38,6 +40,10 @@ import {
  * Column order in the `Survey Responses - Contractors` sheet. Matches the
  * positional output of `contractorResponseRow` in the responses route.
  */
+// `pct_data_centers` is appended after `other_segment_name` rather than slotted
+// in beside the other segments: the row writer is positional, so a mid-list
+// insert would shift every later column of the sheets already holding
+// responses. Form order is independent of column order.
 export const CONTRACTOR_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'year_founded', 'top_executive', 'top_executive_title',
@@ -56,6 +62,7 @@ export const CONTRACTOR_RESPONSE_COLUMNS = [
   'pct_underground', 'pct_telecomm', 'pct_wastewater', 'pct_heavy_civil',
   'pct_water', 'pct_highway', 'pct_oil_gas', 'pct_power',
   'pct_other', 'other_segment_name',
+  'pct_data_centers',
 ];
 
 const MARKET_DISPLAY_NAMES: Record<string, string> = {
@@ -77,6 +84,7 @@ const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_highway: 'Highway',
   pct_oil_gas: 'Oil & Gas',
   pct_power: 'Power',
+  pct_data_centers: 'Data Centers',
 };
 
 const TOP_MARKETS_N = 4;
@@ -109,10 +117,10 @@ function isUtahHq(firm: Firm): boolean {
 function formatEmployees(firm: Firm): string {
   const ut = (firm.num_employees_ut || '').trim();
   const all = (firm.num_employees_all || '').trim();
-  if (ut && all) return `${ut}/${all}`;
-  if (ut) return ut;
-  if (all) return all;
-  return '';
+  const utFmt = formatCount(ut);
+  const allFmt = formatCount(all);
+  if (utFmt && allFmt) return `${utFmt}/${allFmt}`;
+  return utFmt || allFmt || '';
 }
 
 function headerCells(surveyYear: number): string[][] {
@@ -120,11 +128,16 @@ function headerCells(surveyYear: number): string[][] {
   const prev1 = surveyYear - 2;
   const prev2 = surveyYear - 3;
 
+  // The three revenue years head their own columns on one line; the two
+  // office scopes stack underneath the first of them, labelling the two
+  // revenue lines in each firm's block below. Previously the year was
+  // repeated inside each scope label ('2025 (Utah offices)') and the prior
+  // years were printed twice — editorial reset it to this shape by hand.
   return [
     ['', '', '', '', '', 'Annual Revenues (millions)', '', '', ''],
-    ['Firm Name', 'Year Est.', 'Top Executive', `Largest Utah Project Completed in ${prev}`, `${prev} (Utah offices)`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
-    ['Address', '# Employees (UT/ALL)', 'Title', `Largest Utah Project Started in ${surveyYear}`, `${prev} (All U.S. offices)`, `${prev1}`, `${prev2}`, '', ''],
-    ['', '', 'Years at Firm', '', '', '', '', '', ''],
+    ['Firm Name', 'Year Est.', 'Top Executive', `Largest Utah Project Completed in ${prev}`, `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
+    ['Address', '# Employees (UT/ALL)', 'Title', `Largest Utah Project Started in ${surveyYear}`, '(Utah offices)', '', '', '', ''],
+    ['', '', 'Years at Firm', '', '(All U.S. offices)', '', '', '', ''],
   ];
 }
 
@@ -137,9 +150,24 @@ function firmCells(firm: Firm): string[][] {
   const ut2024 = formatRevenue(firm.revenue_ut_current, isDnd);
   const ut2023 = formatRevenue(firm.revenue_ut_prior_1, isDnd);
   const ut2022 = formatRevenue(firm.revenue_ut_prior_2, isDnd);
-  const all2024 = formatRevenue(firm.revenue_all_current, isDnd);
-  const all2023 = formatRevenue(firm.revenue_all_prior_1, isDnd);
-  const all2022 = formatRevenue(firm.revenue_all_prior_2, isDnd);
+  const allRaw2024 = formatRevenue(firm.revenue_all_current, isDnd);
+  const allRaw2023 = formatRevenue(firm.revenue_all_prior_1, isDnd);
+  const allRaw2022 = formatRevenue(firm.revenue_all_prior_2, isDnd);
+
+  // Firms with no offices outside Utah routinely re-enter their Utah figures
+  // in the All U.S. fields. The magazine prints a single revenue line in that
+  // case, so drop the duplicate second line. Display only — the stored values
+  // stay put, because `gcOverall` ranks on `revenue_all_current` and blanking
+  // the data would drop those firms out of the overall list. DND firms are
+  // exempt: all six cells read 'DND' there, and both lines are meant to.
+  const allDuplicatesUtah =
+    !isDnd &&
+    allRaw2024 === ut2024 &&
+    allRaw2023 === ut2023 &&
+    allRaw2022 === ut2022;
+  const all2024 = allDuplicatesUtah ? '' : allRaw2024;
+  const all2023 = allDuplicatesUtah ? '' : allRaw2023;
+  const all2022 = allDuplicatesUtah ? '' : allRaw2022;
 
   const city = (firm.city || '').trim();
   const state = normalizeState(firm.state);
@@ -171,7 +199,7 @@ function firmCells(firm: Firm): string[][] {
     [formatPhone(firm.phone), '', '',
      '', '', '', '',
      topMarkets[3][0], formatPct(topMarkets[3][1])],
-    [firm.website || '', '', '',
+    [formatWebsite(firm.website), '', '',
      '', '', '', '',
      '', ''],
   ];
@@ -270,7 +298,10 @@ export function generateContractorExport(
         `by firms with offices in Utah. Firms with Utah headquarters are ranked by ` +
         `overall revenues (all U.S. offices). Firms who chose not to disclose ` +
         `revenues (DND) are listed after revenue-disclosing firms based on number ` +
-        `of employees.`,
+        `of employees. Firms with headquarters outside Utah are listed at the end ` +
+        `of the overall rankings, while Utah office revenues are included in the ` +
+        `discipline specific Utah rankings. Every effort was made to contact ` +
+        `respective GC firms and encourage their participation.`,
       surveyYear,
       firms: utahHq,
       revenueKey: 'revenue_all_current',

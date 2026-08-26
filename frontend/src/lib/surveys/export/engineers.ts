@@ -1,14 +1,18 @@
 /**
- * Architect survey export — produces the multi-line tab-delimited blocks
- * the designer pastes directly into InDesign.
+ * Engineering firm survey export — mirrors the architect export's shape,
+ * since the printed engineering page uses the same layout.
  *
  * Output sections:
  *   - utah:       firms with state === 'UT' (revenue-disclosing, then DND)
  *   - outOfState: firms with state !== 'UT' (revenue-disclosing, then DND)
  *
- * Per-firm block is 3 lines (matches the printed page layout). Both .txt and
- * .rtf are emitted for each section so the route can bundle them in a single
- * .zip for the designer.
+ * Per-firm block is 3 lines (matches the printed page layout). The engineering
+ * survey collects no per-discipline headcounts (no equivalent of the
+ * architects' "# Lic. Archs" / "# LEED AP"), so the employee column carries a
+ * single value on the block's first line.
+ *
+ * Both .txt and .rtf are emitted for each section so the route can bundle them
+ * in a single .zip for the designer.
  */
 
 import {
@@ -23,7 +27,6 @@ import {
   isTrue,
   joinProjectAndLocation,
   normalizeState,
-  ordinal,
   parseFloat2,
   parseInt2,
   rowsToDicts,
@@ -32,23 +35,28 @@ import {
   wrapRtf,
 } from './shared';
 
+/**
+ * Column order in the `Survey Responses - Engineers` sheet. Matches the
+ * positional output of `engineerResponseRow` in the responses route.
+ */
 // `pct_data_centers` is appended after `other_segment_name` rather than slotted
 // in beside the other segments: the row writer is positional, so a mid-list
 // insert would shift every later column of the sheets already holding
 // responses. Form order is independent of column order.
-export const ARCHITECT_RESPONSE_COLUMNS = [
+export const ENGINEER_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'location', 'year_founded', 'top_executive',
   'top_executive_title', 'years_at_firm', 'address', 'city', 'state',
   'zip', 'phone', 'marketing_email', 'website', 'other_locations',
-  'num_employees', 'num_licensed_architects', 'num_leed_ap',
+  'num_employees',
   'revenue_current', 'revenue_prior_1', 'revenue_prior_2', 'revenue_dnd',
   'largest_project_completed', 'largest_project_completed_location',
   'largest_project_upcoming', 'largest_project_upcoming_location',
   'pct_k12', 'pct_higher_ed', 'pct_civic', 'pct_healthcare',
   'pct_office', 'pct_resort_hospitality', 'pct_multi_family',
-  'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial', 'pct_other',
-  'other_segment_name',
+  'pct_commercial_retail', 'pct_sports_rec', 'pct_industrial',
+  'pct_highway', 'pct_underground', 'pct_telecomm', 'pct_water',
+  'pct_wastewater', 'pct_other', 'other_segment_name',
   'pct_data_centers',
 ];
 
@@ -63,15 +71,26 @@ const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_commercial_retail: 'Comm/Retail',
   pct_sports_rec: 'Sports/Rec',
   pct_industrial: 'Industrial',
+  pct_highway: 'Highway',
+  pct_underground: 'Underground',
+  pct_telecomm: 'Telecomm',
+  pct_water: 'Water',
+  pct_wastewater: 'Wastewater',
   pct_data_centers: 'Data Centers',
   pct_other: 'Other',
 };
 
-// Column character positions for RTF tab-padding. Indexed by cell position
-// in `firmCells` / `headerCells` (11 cells per row).
-const ARCH_COLUMN_POSITIONS = [0, 25, 45, 55, 80, 145, 155, 165, 175, 185, 200];
+// Top markets shown per firm. Capped at 3 because the printed block is 3 lines
+// tall — the same constraint the architect page works under, even though the
+// engineering survey collects more segments than the architect one.
+const TOP_MARKETS_N = 3;
 
-function getTopMarkets(firm: Firm, n = 3): [string, number][] {
+// Column character positions for RTF tab-padding. Indexed by cell position
+// in `firmCells` / `headerCells` (11 cells per row). Same grid as the
+// architect page so the two lists set identically.
+const ENGINEER_COLUMN_POSITIONS = [0, 25, 45, 55, 80, 145, 155, 165, 175, 185, 200];
+
+function getTopMarkets(firm: Firm, n = TOP_MARKETS_N): [string, number][] {
   const markets: [string, number][] = [];
   const customOther = (firm.other_segment_name || '').trim();
   for (const [key, displayName] of Object.entries(MARKET_DISPLAY_NAMES)) {
@@ -94,8 +113,8 @@ function headerCells(surveyYear: number): string[][] {
   return [
     ['', '', '', '', '', '', 'Annual Revenues (millions)', '', '', '', ''],
     ['Firm Name', 'Phone', 'Year Est.', 'Top Executive', `Largest Utah Project to Finish in ${prev}`, '# Employees', `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
-    ['Address', 'Website', '', 'Title', `Largest Utah Project to Start in ${surveyYear}`, '# Lic. Archs', '', '', '', '', ''],
-    ['', '', '', 'Years at Firm', '', '# LEED AP', '', '', '', '', ''],
+    ['Address', 'Website', '', 'Title', `Largest Utah Project to Break Ground in ${surveyYear}`, '', '', '', '', '', ''],
+    ['', '', '', 'Years at Firm', '', '', '', '', '', '', ''],
   ];
 }
 
@@ -129,10 +148,10 @@ function firmCells(firm: Firm): string[][] {
      topMarkets[0][0], formatPct(topMarkets[0][1])],
     [firm.address || '', formatWebsite(firm.website), '',
      firm.top_executive_title || '', upcomingProject,
-     formatCount(firm.num_licensed_architects), '', '', '',
+     '', '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', '', firm.years_at_firm || '', '',
-     formatCount(firm.num_leed_ap), '', '', '',
+     '', '', '', '',
      topMarkets[2][0], formatPct(topMarkets[2][1])],
   ];
 }
@@ -158,13 +177,13 @@ function buildSection(args: {
   const pushHeader = () => {
     for (const row of headerCells(surveyYear)) {
       txt.push(row.join('\t'));
-      rtf.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+      rtf.push(rtfRow(row, ENGINEER_COLUMN_POSITIONS));
     }
   };
   const pushFirm = (firm: Firm) => {
     for (const row of firmCells(firm)) {
       txt.push(row.join('\t'));
-      rtf.push(rtfRow(row, ARCH_COLUMN_POSITIONS));
+      rtf.push(rtfRow(row, ENGINEER_COLUMN_POSITIONS));
     }
   };
 
@@ -196,7 +215,7 @@ function buildSection(args: {
   return { text: txt.join('\n'), rtf: wrapRtf(rtf) };
 }
 
-export function generateArchitectExport(
+export function generateEngineerExport(
   responses: Firm[],
   surveyYear: number,
 ): ExportResult {
@@ -221,20 +240,19 @@ export function generateArchitectExport(
   outOfStateDnd.sort((a, b) => parseInt2(b.num_employees) - parseInt2(a.num_employees));
 
   const prevYear = surveyYear - 1;
-  const nth = ordinal(surveyYear - 2012);
 
   const sections: ExportSection[] = [];
 
   if (utahRevenue.length + utahDnd.length > 0) {
     const built = buildSection({
-      title: `${surveyYear} Top Utah Architectural Firm Rankings`,
+      title: `${surveyYear} Top Utah Engineering Firm Rankings`,
       intro:
-        `Utah Construction + Design is pleased to publish its ${nth} annual ` +
-        `list of the Top Architectural Firms in Utah, based on revenues ` +
-        `generated in ${prevYear} by a firm’s Utah offices. Projects ` +
-        `outside of Utah that are billed to Utah-based offices are included. ` +
-        `Firms who chose not to disclose revenues (DND) are listed after ` +
-        `revenue-disclosing firms by number of employees.`,
+        `Utah Construction + Design is pleased to publish its annual list of ` +
+        `the Top Engineering Firms in Utah, based on revenues generated in ` +
+        `${prevYear} by a firm’s Utah offices. Projects outside of Utah ` +
+        `that are billed to Utah-based offices are included. Firms who chose ` +
+        `not to disclose revenues (DND) are listed after revenue-disclosing ` +
+        `firms by number of employees.`,
       surveyYear,
       revenueFirms: utahRevenue,
       dndFirms: utahDnd,
@@ -242,7 +260,7 @@ export function generateArchitectExport(
     sections.push({
       key: 'utah',
       label: 'Utah Firms',
-      baseName: `${surveyYear}_ArchRankings`,
+      baseName: `${surveyYear}_EngRankings`,
       text: built.text,
       rtf: built.rtf,
       count: utahRevenue.length + utahDnd.length,
@@ -251,7 +269,7 @@ export function generateArchitectExport(
 
   if (outOfStateRevenue.length + outOfStateDnd.length > 0) {
     const built = buildSection({
-      title: `${surveyYear} Top Architectural Firm Rankings - Out of State`,
+      title: `${surveyYear} Top Engineering Firm Rankings - Out of State`,
       surveyYear,
       revenueFirms: outOfStateRevenue,
       dndFirms: outOfStateDnd,
@@ -259,7 +277,7 @@ export function generateArchitectExport(
     sections.push({
       key: 'outOfState',
       label: 'Out of State',
-      baseName: `${surveyYear}_ArchRankings_OutOfState`,
+      baseName: `${surveyYear}_EngRankings_OutOfState`,
       text: built.text,
       rtf: built.rtf,
       count: outOfStateRevenue.length + outOfStateDnd.length,
@@ -269,6 +287,6 @@ export function generateArchitectExport(
   return { sections };
 }
 
-export function rowsToArchitectFirms(rows: string[][]): Firm[] {
-  return rowsToDicts(rows, ARCHITECT_RESPONSE_COLUMNS);
+export function rowsToEngineerFirms(rows: string[][]): Firm[] {
+  return rowsToDicts(rows, ENGINEER_RESPONSE_COLUMNS);
 }
