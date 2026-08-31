@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import {
   responseTabFor,
   SURVEYS_TAB,
@@ -75,15 +75,19 @@ export async function GET(
 
     const sheets = await getSheetsClient(true);
 
-    // Fetch recipients, surveys, and contacts in parallel. Responses are
+    // Recipients, surveys, and contacts in a single round trip. Responses are
     // fetched after we know the templateId so we hit the right per-template tab.
-    const [recipientsRes, surveysRes, contactsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEY_RECIPIENTS_TAB}!A:Z` }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEYS_TAB}!A:Z` }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEY_CONTACTS_TAB}!A:Z` }),
-    ]);
+    const [recipientValues, surveyValues, contactValues] = await batchGetValues(
+      sheets,
+      spreadsheetId,
+      [
+        `${SURVEY_RECIPIENTS_TAB}!A:Z`,
+        `${SURVEYS_TAB}!A:Z`,
+        `${SURVEY_CONTACTS_TAB}!A:Z`,
+      ],
+    );
 
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     if (recipientRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -112,7 +116,7 @@ export async function GET(
     const isCompleted = recipientRow[statusCol] === 'completed';
 
     // --- Survey metadata ---
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -142,7 +146,7 @@ export async function GET(
     const templateId = surveyRow[templateCol] || 'architects';
 
     // --- Firm collaborators (active contacts in this firm + category) ---
-    const contactRows = contactsRes.data.values || [];
+    const contactRows = contactValues || [];
     const collaborators: { name: string; email: string }[] = [];
 
     if (contactRows.length >= 2 && firmName) {

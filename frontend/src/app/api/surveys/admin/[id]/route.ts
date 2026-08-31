@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -21,24 +21,15 @@ export async function GET(
 
     const sheets = await getSheetsClient(true);
 
-    // Fetch surveys, recipients, and contacts in parallel
-    const [surveysRes, recipientsRes, contactsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Surveys!A:Z',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Survey Recipients!A:Z',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Survey Contacts!A:Z',
-      }),
-    ]);
+    // Surveys, recipients, and contacts in a single round trip
+    const [surveyValues, recipientValues, contactValues] = await batchGetValues(
+      sheets,
+      spreadsheetId,
+      ['Surveys!A:Z', 'Survey Recipients!A:Z', 'Survey Contacts!A:Z'],
+    );
 
     // Find survey
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -60,7 +51,7 @@ export async function GET(
     const surveyCategory = surveyRow[sCategoryCol] || '';
 
     // Build contacts lookup by firm_name (from master list)
-    const contactRows = contactsRes.data.values || [];
+    const contactRows = contactValues || [];
     const contactsByFirm: Record<string, { contactName: string; contactEmail: string }[]> = {};
 
     if (contactRows.length >= 2) {
@@ -88,7 +79,7 @@ export async function GET(
     }
 
     // Find recipients for this survey (firm-level)
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     const recipients: any[] = [];
 
     if (recipientRows.length >= 2) {

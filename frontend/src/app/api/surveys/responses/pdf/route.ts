@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import { surveyTemplates } from '@/lib/surveys/templates';
 import type { SurveyTemplate } from '@/lib/surveys/templates';
 import { responseTabFor, SURVEYS_TAB, SURVEY_RECIPIENTS_TAB } from '@/lib/surveys/sheets';
@@ -70,16 +70,13 @@ export async function GET(request: NextRequest) {
 
     const sheets = await getSheetsClient(true);
 
-    const [recipientsRes, surveysRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${SURVEY_RECIPIENTS_TAB}!A:Z`,
-      }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEYS_TAB}!A:Z` }),
+    const [recipientValues, surveyValues] = await batchGetValues(sheets, spreadsheetId, [
+      `${SURVEY_RECIPIENTS_TAB}!A:Z`,
+      `${SURVEYS_TAB}!A:Z`,
     ]);
 
     // --- Recipient by token ---
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     if (recipientRows.length < 2) {
       return NextResponse.json({ error: 'Submission not found' }, { status: 404 });
     }
@@ -101,7 +98,7 @@ export async function GET(request: NextRequest) {
     const isCompleted = recipientRow[rStatusCol] === 'completed';
 
     // --- Survey metadata ---
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     const sHeaders = surveyRows[0] || [];
     const sIdCol = sHeaders.indexOf('survey_id');
     const sNameCol = sHeaders.indexOf('name');
