@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -29,24 +29,16 @@ export async function POST(
 
     const sheets = await getSheetsClient();
 
-    // Fetch survey to get its category, plus contacts and existing recipients
-    const [surveysRes, contactsRes, recipientsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Surveys!A:Z',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Survey Contacts!A:Z',
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: 'Survey Recipients!A:Z',
-      }),
-    ]);
+    // Survey (for its category), contacts, and existing recipients in a single
+    // round trip
+    const [surveyValues, contactValues, recipientValues] = await batchGetValues(
+      sheets,
+      spreadsheetId,
+      ['Surveys!A:Z', 'Survey Contacts!A:Z', 'Survey Recipients!A:Z'],
+    );
 
     // Find survey category
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -62,7 +54,7 @@ export async function POST(
     const surveyCategory = surveyRow[sCategoryCol] || '';
 
     // Parse master contact list — filter by category + active
-    const contactRows = contactsRes.data.values || [];
+    const contactRows = contactValues || [];
     if (contactRows.length < 2) {
       return NextResponse.json(
         { error: 'No contacts found in the master contact list' },
@@ -98,7 +90,7 @@ export async function POST(
     }
 
     // Find firms already in Survey Recipients for this survey
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     const existingFirms = new Set<string>();
 
     if (recipientRows.length >= 2) {

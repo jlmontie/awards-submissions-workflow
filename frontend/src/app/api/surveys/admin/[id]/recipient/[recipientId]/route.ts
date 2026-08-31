@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import {
   responseTabFor,
   SURVEYS_TAB,
@@ -50,14 +50,14 @@ export async function GET(
 
     const sheets = await getSheetsClient(true);
 
-    // Fetch surveys + recipients in parallel. Responses come from the
+    // Surveys + recipients in a single round trip. Responses come from the
     // template-specific tab, so we fetch them after we know which template.
-    const [surveysRes, recipientsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEYS_TAB}!A:Z` }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: `${SURVEY_RECIPIENTS_TAB}!A:Z` }),
+    const [surveyValues, recipientValues] = await batchGetValues(sheets, spreadsheetId, [
+      `${SURVEYS_TAB}!A:Z`,
+      `${SURVEY_RECIPIENTS_TAB}!A:Z`,
     ]);
 
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -72,7 +72,7 @@ export async function GET(
     }
     const templateId = surveyRow[sTemplateCol] || 'architects';
 
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     if (recipientRows.length < 2) {
       return NextResponse.json({ error: 'Recipient not found' }, { status: 404 });
     }

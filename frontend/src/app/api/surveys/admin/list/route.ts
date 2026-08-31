@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import {
   RESPONSE_TABS,
   SURVEYS_TAB,
@@ -23,28 +23,23 @@ export async function GET() {
 
     const responseTabNames = Object.values(RESPONSE_TABS);
 
-    // Fetch surveys, recipients, and all per-template response tabs in parallel.
-    // Each response fetch is wrapped to tolerate a missing tab (e.g. if a new
-    // template's sheet hasn't been created yet) without failing the whole list.
-    const [surveysRes, recipientsRes, ...responseResults] = await Promise.all([
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${SURVEYS_TAB}!A:Z`,
-      }),
-      sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range: `${SURVEY_RECIPIENTS_TAB}!A:Z`,
-      }),
-      ...responseTabNames.map((tab) =>
-        sheets.spreadsheets.values
-          .get({ spreadsheetId, range: `${tab}!A:B` })
-          .catch(() => null),
-      ),
-    ]);
+    // Surveys, recipients, and every per-template response tab in a single
+    // round trip. batchGetValues degrades to per-range reads only if a tab is
+    // missing (e.g. a new template whose sheet hasn't been created yet), so one
+    // absent tab still doesn't fail the whole list.
+    const [surveyValues, recipientValues, ...responseValues] = await batchGetValues(
+      sheets,
+      spreadsheetId,
+      [
+        `${SURVEYS_TAB}!A:Z`,
+        `${SURVEY_RECIPIENTS_TAB}!A:Z`,
+        ...responseTabNames.map((tab) => `${tab}!A:B`),
+      ],
+    );
 
-    const surveyRows = surveysRes.data.values || [];
-    const recipientRows = recipientsRes.data.values || [];
-    const responseRowsByTab = responseResults.map((r) => r?.data.values || []);
+    const surveyRows = surveyValues || [];
+    const recipientRows = recipientValues || [];
+    const responseRowsByTab = responseValues.map((rows) => rows || []);
 
     if (surveyRows.length < 2) {
       return NextResponse.json([]);

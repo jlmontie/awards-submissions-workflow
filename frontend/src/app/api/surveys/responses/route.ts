@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 import { surveyTemplates, normalizeSubmission } from '@/lib/surveys/templates';
 import {
   responseTabFor,
@@ -44,12 +44,14 @@ export async function POST(request: NextRequest) {
 
     const sheets = await getSheetsClient();
 
-    // 1. Look up recipient by token
-    const recipientsRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${SURVEY_RECIPIENTS_TAB}!A:Z`,
-    });
-    const recipientRows = recipientsRes.data.values || [];
+    // 1. Look up recipient by token. The survey tab is pulled in the same
+    // round trip — neither read depends on the other, and they were previously
+    // two serialized calls on the submit path.
+    const [recipientValues, surveyValues] = await batchGetValues(sheets, spreadsheetId, [
+      `${SURVEY_RECIPIENTS_TAB}!A:Z`,
+      `${SURVEYS_TAB}!A:Z`,
+    ]);
+    const recipientRows = recipientValues || [];
     if (recipientRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -82,12 +84,8 @@ export async function POST(request: NextRequest) {
     const firmName = firmNameCol !== -1 ? (recipientRow[firmNameCol] || '').trim() : '';
     const now = new Date().toISOString();
 
-    // 2. Look up survey row to determine template (and which response tab)
-    const surveysRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${SURVEYS_TAB}!A:Z`,
-    });
-    const surveyRows = surveysRes.data.values || [];
+    // 2. Survey row determines the template (and which response tab)
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { getSheetsClient } from '@/lib/google-sheets';
+import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -269,15 +269,15 @@ export async function POST(
 
     const sheets = await getSheetsClient();
 
-    // Fetch all three sheets in parallel
-    const [surveysRes, recipientsRes, contactsRes] = await Promise.all([
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Surveys!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Recipients!A:Z' }),
-      sheets.spreadsheets.values.get({ spreadsheetId, range: 'Survey Contacts!A:Z' }),
-    ]);
+    // All three sheets in a single round trip
+    const [surveyValues, recipientValues, contactValues] = await batchGetValues(
+      sheets,
+      spreadsheetId,
+      ['Surveys!A:Z', 'Survey Recipients!A:Z', 'Survey Contacts!A:Z'],
+    );
 
     // --- Survey metadata ---
-    const surveyRows = surveysRes.data.values || [];
+    const surveyRows = surveyValues || [];
     if (surveyRows.length < 2) {
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
@@ -296,7 +296,7 @@ export async function POST(
     const surveyDeadline = surveyRow[sDeadlineCol] || '';
 
     // --- Contacts lookup ---
-    const contactRows = contactsRes.data.values || [];
+    const contactRows = contactValues || [];
     const contactsByFirm: Record<string, { contactName: string; contactEmail: string }[]> = {};
 
     if (contactRows.length >= 2) {
@@ -323,7 +323,7 @@ export async function POST(
     }
 
     // --- Recipients ---
-    const recipientRows = recipientsRes.data.values || [];
+    const recipientRows = recipientValues || [];
     if (recipientRows.length < 2) {
       return NextResponse.json({ error: 'No recipients found' }, { status: 404 });
     }
