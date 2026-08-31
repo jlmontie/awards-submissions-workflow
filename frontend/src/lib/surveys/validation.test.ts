@@ -4,6 +4,7 @@ import {
   validateSurvey,
   RAW_DOLLARS_THRESHOLD_MILLIONS,
 } from './validation';
+import { checkboxFieldKeys, surveyTemplates } from './templates';
 import type { SurveyField, SurveyTemplate } from './templates';
 
 function field(overrides: Partial<SurveyField> & Pick<SurveyField, 'type'>): SurveyField {
@@ -149,5 +150,42 @@ describe('validateSurvey', () => {
       seg_b: '30',
     });
     expect(errors._percentage_group).toContain('90%');
+  });
+});
+
+describe('checkboxFieldKeys', () => {
+  it('includes every engineer discipline', () => {
+    // These were missing from the hand-maintained list they replaced, so
+    // editing a completed engineer submission read them back as the string
+    // 'FALSE' — which is truthy, and showed every discipline selected.
+    const keys = checkboxFieldKeys('engineers');
+    expect(keys.has('discipline_civil')).toBe(true);
+    expect(keys.has('discipline_mep')).toBe(true);
+    expect(keys.has('discipline_structural')).toBe(true);
+    expect(keys.has('revenue_dnd')).toBe(true);
+  });
+
+  it('includes every contractor discipline', () => {
+    const keys = checkboxFieldKeys('contractors');
+    expect(keys.has('discipline_general_building')).toBe(true);
+    expect(keys.has('discipline_heavy_highway')).toBe(true);
+    expect(keys.has('discipline_municipal_utility')).toBe(true);
+    expect(keys.has('revenue_dnd')).toBe(true);
+  });
+
+  it('covers every checkbox field in every template and nothing else', () => {
+    for (const [templateId, template] of Object.entries(surveyTemplates)) {
+      const expected = new Set(
+        template.sections.flatMap((s) =>
+          s.fields.filter((f) => f.type === 'checkbox').map((f) => f.key),
+        ),
+      );
+      expect(checkboxFieldKeys(templateId)).toEqual(expected);
+      expect(expected.size).toBeGreaterThan(0);
+    }
+  });
+
+  it('returns an empty set for an unknown template', () => {
+    expect(checkboxFieldKeys('nope').size).toBe(0);
   });
 });
