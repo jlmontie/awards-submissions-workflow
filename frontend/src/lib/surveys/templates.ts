@@ -298,6 +298,31 @@ export const surveyTemplates: Record<string, SurveyTemplate> = {
 };
 
 /**
+ * Keys of every checkbox field in a template.
+ *
+ * Checkboxes round-trip through the sheet as the strings 'TRUE'/'FALSE', and
+ * the form renders them with `checked={!!value}` — so a value left as the
+ * string 'FALSE' is truthy and shows the box ticked. Anything reading a
+ * response row back into form data has to coerce these keys to real booleans.
+ *
+ * Derived from the template rather than hand-listed: the hardcoded list this
+ * replaces silently missed the engineer disciplines when they were added, so
+ * editing a completed engineer submission showed the wrong discipline selected.
+ */
+export function checkboxFieldKeys(templateId: string): Set<string> {
+  const template = surveyTemplates[templateId];
+  if (!template) return new Set();
+
+  const keys = new Set<string>();
+  for (const section of template.sections) {
+    for (const field of section.fields) {
+      if (field.type === 'checkbox') keys.add(field.key);
+    }
+  }
+  return keys;
+}
+
+/**
  * Apply each field's named normalizer to the submission data. Returns a new
  * object — does not mutate the input. Fields without a `normalize` tag, or
  * keys not present in `data`, are left untouched.

@@ -6,6 +6,7 @@ import {
   SURVEY_RECIPIENTS_TAB,
   SURVEY_CONTACTS_TAB,
 } from '@/lib/surveys/sheets';
+import { checkboxFieldKeys } from '@/lib/surveys/templates';
 import { ARCHITECT_RESPONSE_COLUMNS } from '@/lib/surveys/export/architects';
 import { CONTRACTOR_RESPONSE_COLUMNS } from '@/lib/surveys/export/contractors';
 import { ENGINEER_RESPONSE_COLUMNS } from '@/lib/surveys/export/engineers';
@@ -24,16 +25,6 @@ export const runtime = 'nodejs';
  *   "Survey Recipients" sheet: recipient_id | survey_id | firm_name | token | status | sent_at | reminded_at | completed_at | draft_data | draft_saved_at
  *   "Survey Responses - {Template}" sheet: per-template column schema
  */
-
-// Fields that the form sends as booleans and the sheet stores as 'TRUE'/'FALSE'.
-// When prefilling an existing submission for editing, these need to be coerced
-// back to booleans so the checkbox state restores correctly.
-const BOOLEAN_FIELDS = new Set([
-  'revenue_dnd',
-  'discipline_general_building',
-  'discipline_heavy_highway',
-  'discipline_municipal_utility',
-]);
 
 // Metadata columns that aren't form fields and shouldn't round-trip into the
 // edit form's data object.
@@ -203,7 +194,11 @@ export async function GET(
               (row) => row[respRecipientCol] === recipientId,
             );
             if (responseRow) {
-              prefillData = responseRowToData(headers, responseRow);
+              prefillData = responseRowToData(
+                headers,
+                responseRow,
+                checkboxFieldKeys(templateId),
+              );
               prefillSavedAt =
                 respSubmittedAtCol !== -1 ? responseRow[respSubmittedAtCol] || null : null;
             }
@@ -248,19 +243,23 @@ export async function GET(
 }
 
 /**
- * Convert a response sheet row back into a form-data object. Coerces known
- * boolean fields back to true/false; other fields pass through as strings.
+ * Convert a response sheet row back into a form-data object. Coerces the
+ * template's checkbox fields back to true/false; other fields pass through as
+ * strings. The sheet stores checkboxes as 'TRUE'/'FALSE', and the form renders
+ * them with `checked={!!value}`, so leaving 'FALSE' as a string would show the
+ * box ticked.
  */
 function responseRowToData(
   headers: string[],
   row: string[],
+  booleanFields: Set<string>,
 ): Record<string, string | boolean> {
   const data: Record<string, string | boolean> = {};
   for (let i = 0; i < headers.length; i++) {
     const key = headers[i];
     if (!key || METADATA_FIELDS.has(key)) continue;
     const val = row[i] ?? '';
-    if (BOOLEAN_FIELDS.has(key)) {
+    if (booleanFields.has(key)) {
       data[key] = String(val).toUpperCase() === 'TRUE';
     } else {
       data[key] = val;
