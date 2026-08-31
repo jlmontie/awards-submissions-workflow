@@ -39,10 +39,11 @@ import {
  * Column order in the `Survey Responses - Engineers` sheet. Matches the
  * positional output of `engineerResponseRow` in the responses route.
  */
-// `pct_data_centers` is appended after `other_segment_name` rather than slotted
-// in beside the other segments: the row writer is positional, so a mid-list
-// insert would shift every later column of the sheets already holding
-// responses. Form order is independent of column order.
+// `pct_data_centers` and the `discipline_*` columns are appended after
+// `other_segment_name` rather than slotted in with related fields: the row
+// writer is positional, so a mid-list insert would shift every later column of
+// the sheets already holding responses. Form order is independent of column
+// order.
 export const ENGINEER_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'location', 'year_founded', 'top_executive',
@@ -58,6 +59,7 @@ export const ENGINEER_RESPONSE_COLUMNS = [
   'pct_highway', 'pct_underground', 'pct_telecomm', 'pct_water',
   'pct_wastewater', 'pct_other', 'other_segment_name',
   'pct_data_centers',
+  'discipline_civil', 'discipline_mep', 'discipline_structural',
 ];
 
 const MARKET_DISPLAY_NAMES: Record<string, string> = {

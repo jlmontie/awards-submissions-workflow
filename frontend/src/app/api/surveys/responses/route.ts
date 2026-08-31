@@ -387,6 +387,9 @@ function engineerResponseRow({ responseId, surveyId, recipientId, token, now, da
     // Appended after `other_segment_name` to keep every existing column at its
     // current position — see the note on the *_RESPONSE_COLUMNS constants.
     data.pct_data_centers,
+    data.discipline_civil,
+    data.discipline_mep,
+    data.discipline_structural,
   ].map(stringify);
 }
 
