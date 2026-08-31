@@ -13,6 +13,16 @@ resource "google_cloud_run_v2_service" "frontend" {
       max_instance_count = 10
     }
 
+    # Cloud Run's default of 80 lets a single instance absorb far more traffic
+    # than one Node process on 1 vCPU can serve, so a slow upstream stalls
+    # requests on that instance instead of tripping the autoscaler. On
+    # 2026-08-31 every stalled /api/surveys/admin/list piled onto one instance
+    # and Cloud Run never scaled out, because 80 concurrent was never reached.
+    # These routes are I/O-bound on the Sheets API, so a handful in flight is
+    # still comfortable; 10 keeps that headroom while making a pileup scale out
+    # (10 instances x 10 = 100 concurrent requests, well past this app's load).
+    max_instance_request_concurrency = 10
+
     containers {
       # Start with placeholder image - Cloud Build will update it
       # This prevents "image not found" errors on first deploy
