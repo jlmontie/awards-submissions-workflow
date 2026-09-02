@@ -1,40 +1,32 @@
-﻿Order,ProjectCategory
-1,Project of the Year
-2,Adaptive Reuse
-3,Commercial/Financial
-4,Commercial/Mixed-Use
-5,Commercial/Office
-6,Commercial/Retail
-7,Community Impact
-8,Community/Cultural
-9,Concrete/Structures
-10,Concrete/Tilt-Up
-11,Design/Build
-12,Energy
-13,Entertainment
-14,Green/Sustainable
-15,Healthcare - Large
-16,Healthcare - Small
-17,High-rise
-18,Higher Education
-19,Highway
-20,Hospitality/Resort
-21,Industrial
-22,K-12
-23,Multifamily
-24,Municipal
-25,Municipal/Utility
-26,Parks & Plaza
-27,Private Over $10 M
-28,Private Under $10
-29,Public Over $10 M
-30,Public Under $10 M
-31,Publisher's Pick
-32,Renovation
-33,Restaurant
-34,Specialty Contracting - Electrical
-35,Specialty Contracting - Masonry
-36,Specialty Contracting - Mechanical
-37,Sports/Recreation
-38,Tenant Improvement
-39,Water
+Order,ProjectCategory
+1,Commercial/Mixed-Use
+2,Commercial/Office
+3,Commercial/Retail
+4,Community/Cultural
+5,Concrete/Structures
+6,Concrete/Tilt-Up
+7,Design/Build
+8,Entertainment
+9,Green/Sustainable
+10,Healthcare - Large
+11,Healthcare - Small
+12,Higher Education
+13,Highway Over $10 M
+14,Highway Under $10 M
+15,Hospitality/Resort
+16,Industrial
+17,K-12
+18,Mass Transit/Airport
+19,Multi-Family
+20,Municipal/Utility
+21,Private Over $10 M
+22,Private Under $10 M
+23,Public Over $10 M
+24,Public Under $10 M
+25,Renovation/Restoration
+26,Specialty Contracting - Electrical
+27,Specialty Contracting - Masonry
+28,Specialty Contracting - Mechanical
+29,Sports/Recreation
+30,Tenant Improvement
+31,Water/Wastewater
