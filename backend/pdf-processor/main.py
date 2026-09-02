@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID')
 DRIVE_FOLDER_SECRET = os.environ.get('DRIVE_FOLDER_SECRET')
 AWARDS_SHEET_ID_SECRET = os.environ.get('AWARDS_SHEET_ID_SECRET')
+USER_OAUTH_TOKEN_SECRET = os.environ.get('USER_OAUTH_TOKEN_SECRET')
 SUBMISSIONS_BUCKET = os.environ.get('SUBMISSIONS_BUCKET')
 MAX_PDF_SIZE_MB = int(os.environ.get('MAX_PDF_SIZE_MB', 50))
 DRIVE_OWNER_EMAIL = os.environ.get('DRIVE_OWNER_EMAIL')  # Email of Drive folder owner
@@ -68,10 +69,15 @@ def get_secret(secret_id: str) -> str:
 
 
 def get_user_credentials():
-    """Get user OAuth credentials from Secret Manager."""
-    secret_name = f"projects/{PROJECT_ID}/secrets/awards-production-user-oauth-token/versions/latest"
-    response = secret_client.access_secret_version(request={"name": secret_name})
-    token_data = json.loads(response.payload.data.decode('UTF-8'))
+    """Get user OAuth credentials from Secret Manager.
+
+    Reads the secret name from USER_OAUTH_TOKEN_SECRET so the terraform-managed
+    prefix (e.g. ucd-production-awards-user-oauth-token) is the source of
+    truth — nothing hardcoded here.
+    """
+    if not USER_OAUTH_TOKEN_SECRET:
+        raise RuntimeError("USER_OAUTH_TOKEN_SECRET env var is not set")
+    token_data = json.loads(get_secret(USER_OAUTH_TOKEN_SECRET))
 
     # Create credentials from the user's OAuth token
     credentials = Credentials(

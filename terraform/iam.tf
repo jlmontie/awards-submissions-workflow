@@ -125,6 +125,15 @@ resource "google_secret_manager_secret_iam_member" "backend_resend_api_key" {
   member    = "serviceAccount:${google_service_account.backend.email}"
 }
 
+# Grant the backend service account access to the user OAuth refresh token.
+# Both pdf-processor and photo-processor run under this SA and use the token
+# to authenticate to Drive and Sheets as the folder-owning user.
+resource "google_secret_manager_secret_iam_member" "backend_user_oauth_token" {
+  secret_id = google_secret_manager_secret.user_oauth_token.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.backend.email}"
+}
+
 # Output service account emails
 output "backend_service_account_email" {
   value       = google_service_account.backend.email

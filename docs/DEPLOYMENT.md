@@ -1,7 +1,7 @@
 # Deployment Guide
 
 Complete guide for deploying the Construction Awards Submission system to production.  
-**See also:** [README.md](../../README.md) | [ROADMAP.md](../ROADMAP.md)
+**See also:** [README.md](../README.md) | [ROADMAP.md](ROADMAP.md)
 
 ---
 
@@ -35,50 +35,12 @@ chmod +x scripts/setup-google-apis.sh
 ## Step 2: Google Drive and Sheets
 
 1. **Drive:** Create folder "Awards Submissions" and copy the folder ID from the URL.
-2. **Sheets:** Create spreadsheet "Awards Submissions Master" with headers (Submission Date, Submission ID, Project Name, Location, Cost, Completion Date, Company, Contact Name, Email, Phone, PDF Link, Drive Folder, etc.). Copy the Sheet ID.
+2. **Sheets:** Create spreadsheet "Awards Submissions Master" and copy the Sheet ID. Headers are optional — the PDF processor appends rows in a fixed column order and doesn't read the header row (see [`backend/pdf-processor/main.py`](../backend/pdf-processor/main.py) `process_pdf` → `row_data` for the authoritative column list).
 3. **reCAPTCHA:** Register site at [reCAPTCHA Admin](https://www.google.com/recaptcha/admin) (v3) and save Site Key and Secret Key.
 
 ---
 
-## Step 3: OAuth Authentication (Required)
-
-Cloud Functions access Drive and Sheets **as you** (your storage quota). Do not skip.
-
-### 3.1 Generate OAuth Credentials
-
-```bash
-gcloud auth application-default login
-```
-
-Sign in with the account that **owns** the Drive folder.
-
-### 3.2 Store in Secret Manager
-
-```bash
-cat ~/.config/gcloud/application_default_credentials.json | \
-  gcloud secrets create awards-production-user-oauth-token \
-    --data-file=- \
-    --project=YOUR_PROJECT_ID
-```
-
-### 3.3 Grant Service Account Access to Secret
-
-```bash
-gcloud secrets add-iam-policy-binding awards-production-user-oauth-token \
-  --member="serviceAccount:awards-production-backend@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor" \
-  --project=YOUR_PROJECT_ID
-```
-
-### 3.4 Update terraform.tfvars
-
-```hcl
-drive_owner_email = "your-email@gmail.com"  # Must match OAuth account
-```
-
----
-
-## Step 4: Configure Terraform
+## Step 3: Configure Terraform
 
 ```bash
 cd terraform
@@ -91,17 +53,17 @@ Edit `terraform.tfvars`:
 project_id             = "your-gcp-project-id"
 region                 = "us-central1"
 drive_root_folder_id   = "your-drive-folder-id"
-master_sheet_id       = "your-sheet-id"
-recaptcha_site_key    = "your-recaptcha-site-key"
-recaptcha_secret_key  = "your-recaptcha-secret-key"
-admin_email           = "your-email@example.com"
-drive_owner_email     = "your-email@example.com"
-environment           = "production"
+master_sheet_id        = "your-sheet-id"
+recaptcha_site_key     = "your-recaptcha-site-key"
+recaptcha_secret_key   = "your-recaptcha-secret-key"
+admin_email            = "your-email@example.com"
+drive_owner_email      = "your-email@gmail.com"   # must own the Drive folder
+environment            = "production"
 ```
 
 ---
 
-## Step 5: Deploy with Terraform
+## Step 4: Deploy with Terraform
 
 ```bash
 terraform init
@@ -109,7 +71,46 @@ terraform plan   # Review resources
 terraform apply
 ```
 
-Share the Drive folder and Google Sheet with the backend service account (Editor). Get the email from `terraform output backend_sa_email`.
+`apply` creates every Cloud resource, the Secret Manager shells, and the IAM
+bindings — including the shell for the OAuth token secret
+(`ucd-production-awards-user-oauth-token`) that the Cloud Functions use to
+authenticate to Drive and Sheets. The one thing it can't do is populate that
+secret's *version*, because the value is a user credential generated
+interactively. That's Step 5.
+
+Share the Drive folder and Google Sheet with the backend service account (Editor). Get the email from `terraform output backend_service_account_email`.
+
+---
+
+## Step 5: OAuth Authentication (Required)
+
+Cloud Functions access Drive and Sheets **as you** (your storage quota). Do not skip.
+
+### 5.1 Generate the OAuth refresh token
+
+You'll need an OAuth Client ID/Secret with `https://www.googleapis.com/auth/drive` and `https://www.googleapis.com/auth/spreadsheets` scopes (Desktop-type client in the Google Cloud Console). Then:
+
+```bash
+python scripts/get-user-oauth-token.py
+```
+
+The script opens a browser — sign in with the account that **owns** the Drive folder. It writes the refresh token to `/tmp/user-oauth-token.json`.
+
+### 5.2 Add the token as a new version of the terraform-managed secret
+
+```bash
+gcloud secrets versions add ucd-production-awards-user-oauth-token \
+  --data-file=/tmp/user-oauth-token.json \
+  --project=YOUR_PROJECT_ID
+
+rm /tmp/user-oauth-token.json
+```
+
+IAM is already bound by terraform (see `terraform/iam.tf`, `backend_user_oauth_token`) — no manual `add-iam-policy-binding` step.
+
+### 5.3 Verify
+
+Upload a PDF via the awards page and check `gcloud functions logs read ucd-production-awards-pdf-processor --region=us-central1 --limit=50` for a successful `Appended row to sheet` line and no `NotFound: Secret ... not found` errors.
 
 ---
 
