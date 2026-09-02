@@ -90,6 +90,30 @@ resource "google_secret_manager_secret_version" "sheets_sa_key_version" {
   secret_data = local.google_service_account_key
 }
 
+# User OAuth refresh token used by the backend Cloud Functions to act on the
+# Drive folder / Sheet as the folder-owning user (not the service account, which
+# doesn't have Drive quota on personal accounts).
+#
+# Terraform owns the secret shell, labels, and IAM; the version is populated
+# manually because the value is a user credential generated interactively via
+# scripts/get-user-oauth-token.py:
+#
+#   python scripts/get-user-oauth-token.py    # writes /tmp/user-oauth-token.json
+#   gcloud secrets versions add ucd-production-awards-user-oauth-token \
+#     --data-file=/tmp/user-oauth-token.json --project=<project>
+#   rm /tmp/user-oauth-token.json
+resource "google_secret_manager_secret" "user_oauth_token" {
+  secret_id = "${local.awards_prefix}-user-oauth-token"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required_apis]
+}
+
 # Reference the externally-managed email password secret.
 # This secret is created/rotated manually (not by Terraform) and holds the SMTP password.
 data "google_secret_manager_secret" "email_password" {

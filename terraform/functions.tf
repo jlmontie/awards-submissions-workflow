@@ -52,12 +52,13 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
     all_traffic_on_latest_revision   = true
 
     environment_variables = {
-      GCP_PROJECT_ID          = var.project_id
-      DRIVE_FOLDER_SECRET     = google_secret_manager_secret.drive_folder.secret_id
-      AWARDS_SHEET_ID_SECRET  = google_secret_manager_secret.awards_sheet_id.secret_id
-      SUBMISSIONS_BUCKET      = google_storage_bucket.submissions.name
-      MAX_PDF_SIZE_MB         = var.max_pdf_size_mb
-      DRIVE_OWNER_EMAIL       = var.drive_owner_email
+      GCP_PROJECT_ID           = var.project_id
+      DRIVE_FOLDER_SECRET      = google_secret_manager_secret.drive_folder.secret_id
+      AWARDS_SHEET_ID_SECRET   = google_secret_manager_secret.awards_sheet_id.secret_id
+      USER_OAUTH_TOKEN_SECRET  = google_secret_manager_secret.user_oauth_token.secret_id
+      SUBMISSIONS_BUCKET       = google_storage_bucket.submissions.name
+      MAX_PDF_SIZE_MB          = var.max_pdf_size_mb
+      DRIVE_OWNER_EMAIL        = var.drive_owner_email
 
       # SMTP for the submitter confirmation email. Same Resend gateway the
       # frontend uses for survey mail; password read from Secret Manager by
@@ -127,11 +128,12 @@ resource "google_cloudfunctions2_function" "photo_processor" {
     all_traffic_on_latest_revision   = true
 
     environment_variables = {
-      GCP_PROJECT_ID      = var.project_id
-      DRIVE_FOLDER_SECRET = google_secret_manager_secret.drive_folder.secret_id
-      SUBMISSIONS_BUCKET  = google_storage_bucket.submissions.name
-      MAX_PHOTO_SIZE_MB   = var.max_photo_size_mb
-      DRIVE_OWNER_EMAIL   = var.drive_owner_email
+      GCP_PROJECT_ID          = var.project_id
+      DRIVE_FOLDER_SECRET     = google_secret_manager_secret.drive_folder.secret_id
+      USER_OAUTH_TOKEN_SECRET = google_secret_manager_secret.user_oauth_token.secret_id
+      SUBMISSIONS_BUCKET      = google_storage_bucket.submissions.name
+      MAX_PHOTO_SIZE_MB       = var.max_photo_size_mb
+      DRIVE_OWNER_EMAIL       = var.drive_owner_email
     }
   }
 

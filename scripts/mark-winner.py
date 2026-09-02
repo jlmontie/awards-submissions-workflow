@@ -33,6 +33,9 @@ from datetime import datetime
 # Configuration
 PROJECT_ID = os.environ.get('GCP_PROJECT_ID', 'your-project-id')
 AWARDS_SHEET_ID = os.environ.get('AWARDS_SHEET_ID', None)
+USER_OAUTH_TOKEN_SECRET = os.environ.get(
+    'USER_OAUTH_TOKEN_SECRET', 'ucd-production-awards-user-oauth-token'
+)
 
 
 def get_secret(secret_id: str) -> str:
@@ -52,7 +55,7 @@ def get_sheets_service():
     """
     try:
         # Try user OAuth first (same as Cloud Function)
-        secret_name = f"projects/{PROJECT_ID}/secrets/awards-production-user-oauth-token/versions/latest"
+        secret_name = f"projects/{PROJECT_ID}/secrets/{USER_OAUTH_TOKEN_SECRET}/versions/latest"
         client = secretmanager.SecretManagerServiceClient()
         response = client.access_secret_version(request={"name": secret_name})
         token_data = json.loads(response.payload.data.decode('UTF-8'))
