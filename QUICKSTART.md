@@ -62,13 +62,8 @@ chmod +x scripts/setup-google-apis.sh
 **Create Sheet:**
 1. Go to [Google Sheets](https://sheets.google.com)
 2. Create "Awards Submissions Master"
-3. Add headers:
-   ```
-   Submission Date | Submission ID | Project Name | Location | Cost | 
-   Completion Date | Company | Contact Name | Email | Phone | 
-   PDF Link | Drive Folder | Additional Fields
-   ```
-4. Copy sheet ID from URL (the part after `/spreadsheets/d/`)
+3. Copy sheet ID from URL (the part after `/spreadsheets/d/`)
+4. Headers are optional — the PDF processor appends rows in a fixed column order and does not read the header row. For a matching header row, use the exact list written by [backend/pdf-processor/main.py:672-733](backend/pdf-processor/main.py#L672-L733) as the source of truth (it ends with the four Phase 1 winner-tracking columns: `Awards ID`, `Status`, `Winner Category`, `Winner Notes`).
 
 ### 3. Setup reCAPTCHA (5 min)
 
@@ -206,17 +201,10 @@ terraform output monitoring_dashboard_url
      --budget-amount=50USD
    ```
 
-3. **Customize:** See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for:
-   - PDF field mapping for your specific forms
-   - UI customization (colors, branding)
-   - File size limits
-   - Image processing settings
-
 ### Learn More
 
 - **Detailed Deployment:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
-- **Configuration Options:** [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
-- **Local Development:** [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+- **Roadmap & platform status:** [docs/ROADMAP.md](docs/ROADMAP.md)
 
 ## Troubleshooting
 

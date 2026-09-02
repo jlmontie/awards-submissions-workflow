@@ -5,7 +5,9 @@ Extracts form fields and creates organized folders in Google Drive.
 import os
 import json
 import logging
+import smtplib
 from datetime import datetime
+from email.message import EmailMessage
 from typing import Dict, Any, Optional, List
 import functions_framework
 from google.cloud import storage, secretmanager
@@ -27,6 +29,13 @@ AWARDS_SHEET_ID_SECRET = os.environ.get('AWARDS_SHEET_ID_SECRET')
 SUBMISSIONS_BUCKET = os.environ.get('SUBMISSIONS_BUCKET')
 MAX_PDF_SIZE_MB = int(os.environ.get('MAX_PDF_SIZE_MB', 50))
 DRIVE_OWNER_EMAIL = os.environ.get('DRIVE_OWNER_EMAIL')  # Email of Drive folder owner
+
+# SMTP configuration for confirmation emails
+SMTP_HOST = os.environ.get('SMTP_HOST')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER')
+SMTP_PASS_SECRET = os.environ.get('SMTP_PASS_SECRET')  # Secret Manager name holding SMTP password
+SMTP_FROM = os.environ.get('SMTP_FROM') or SMTP_USER
 
 # Initialize clients
 storage_client = storage.Client()
@@ -456,29 +465,28 @@ def generate_awards_id(service, sheet_id: str, year: str) -> str:
 def format_confirmation_email(awards_id: str, project_name: str, contact_name: str, 
                              contact_email: str, fields: Dict[str, Any]) -> Dict[str, str]:
     """
-    Format confirmation email with submission details and Awards ID.
-    
-    This function creates the email content that will be sent to submitters.
-    Email sending will be implemented in Phase 3 with SendGrid.
-    
+    Format the confirmation email body sent to submitters via send_confirmation_email.
+
     Args:
         awards_id: Unique Awards ID (e.g., "AW-2025-042")
         project_name: Project name
         contact_name: Submitter name
         contact_email: Submitter email
         fields: All extracted PDF fields
-    
+
     Returns:
         Dictionary with 'subject', 'body', and 'to' keys
     """
     submission_date = datetime.now().strftime('%B %d, %Y at %I:%M %p')
-    
+    # awards_id looks like "AW-YYYY-NNN"; pull the year for the awards-cycle wording.
+    award_year = awards_id.split('-')[1] if awards_id.startswith('AW-') else str(datetime.now().year)
+
     subject = f"Award Submission Confirmed - {awards_id}"
-    
+
     body = f"""
 Dear {contact_name},
 
-Thank you for submitting "{project_name}" to the 2025 Utah Construction & Design Excellence Awards!
+Thank you for submitting "{project_name}" to the {award_year} Utah Construction & Design Excellence Awards!
 
 Your submission has been received and assigned:
 
@@ -493,11 +501,7 @@ Category: {fields.get('Project Category or Categories for Consideration', 'Not s
 Submitted: {submission_date}
 Status: Under Review
 
-NEXT STEPS:
------------
-• Our panel of judges will review all submissions in January 2026
-• Winners will be announced at the awards ceremony in February 2026
-• You will be notified via email by February 1, 2026
+Our panel of judges will review all submissions and winners will be notified by email ahead of the awards ceremony. Watch for a follow-up from us with the review timeline.
 
 Questions? Please reply to this email or contact:
 
@@ -523,28 +527,53 @@ This is an automated confirmation. Please keep this email for your records.
     }
 
 
-def log_confirmation_email(email_data: Dict[str, str]):
+def send_confirmation_email(email_data: Dict[str, str]) -> bool:
     """
-    Log confirmation email details.
-    
-    In Phase 1, we log the email content for manual sending if needed.
-    In Phase 3, this will be replaced with actual SendGrid integration.
-    
+    Send a confirmation email via SMTP. Failures are logged and swallowed —
+    a submission is never blocked on email delivery, and the function's
+    RETRY_POLICY_DO_NOT_RETRY means re-raising would just drop the row.
+
     Args:
         email_data: Dictionary with 'to', 'subject', 'body' keys
+
+    Returns:
+        True if the message was accepted by the SMTP server, False otherwise.
     """
-    logger.info("=" * 60)
-    logger.info("CONFIRMATION EMAIL READY TO SEND")
-    logger.info("=" * 60)
-    logger.info(f"To: {email_data['to']}")
-    logger.info(f"Subject: {email_data['subject']}")
-    logger.info("-" * 60)
-    logger.info("Body:")
-    logger.info(email_data['body'])
-    logger.info("=" * 60)
-    logger.info("NOTE: Automatic email sending will be implemented in Phase 3")
-    logger.info("For now, client can send confirmation emails manually if needed")
-    logger.info("=" * 60)
+    if not (SMTP_HOST and SMTP_USER and SMTP_PASS_SECRET):
+        logger.warning(
+            "SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS_SECRET) — "
+            "skipping confirmation email to %s",
+            email_data.get('to'),
+        )
+        return False
+
+    try:
+        smtp_pass = get_secret(SMTP_PASS_SECRET)
+    except Exception as e:
+        logger.error(f"Failed to load SMTP password from Secret Manager: {e}")
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = email_data['subject']
+    msg['From'] = SMTP_FROM
+    msg['To'] = email_data['to']
+    msg.set_content(email_data['body'])
+
+    try:
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+                server.login(SMTP_USER, smtp_pass)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+                server.starttls()
+                server.login(SMTP_USER, smtp_pass)
+                server.send_message(msg)
+        logger.info(f"Sent confirmation email to {email_data['to']}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send confirmation email to {email_data['to']}: {e}")
+        return False
 
 
 def append_to_sheet(service, sheet_id: str, values: list):
@@ -748,7 +777,7 @@ def process_pdf(cloud_event):
                 contact_email=contact_email,
                 fields=fields
             )
-            log_confirmation_email(email_data)
+            send_confirmation_email(email_data)
         else:
             logger.warning("No contact email found - cannot send confirmation")
         

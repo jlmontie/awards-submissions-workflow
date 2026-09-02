@@ -1,6 +1,6 @@
 # UC+D Business Tools Platform — Roadmap
 
-**Last updated:** February 2026
+**Last updated:** September 2026
 
 ---
 
@@ -10,10 +10,12 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 
 | System | Status |
 |--------|--------|
-| **Awards Submissions** | ✅ Working |
-| **Awards ID & Winner Tracking** | ✅ Phase 1 complete |
-| **Admin Portal** | ✅ Phase 2 prototype deployed |
-| **Survey Module** | Planned (Phase 3) |
+| **Awards Submissions** | ✅ Working in production |
+| **Awards ID & Confirmation Email** | ✅ Working (IDs minted server-side, confirmation email sent via SMTP) |
+| **Admin Portal — read-only views** | ✅ Deployed (list, detail) |
+| **Admin Portal — winner marking** | ⏸️ On hold pending client decision on whether the portal owns winner management |
+| **Admin Portal — authentication** | ⏸️ On hold pending client decision on auth method (portal is currently unauthenticated) |
+| **Survey Module** | ✅ Deployed and in active use (creation, distribution, response tracking, export) |
 
 ---
 
@@ -37,44 +39,28 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 
 ### Phase 1: Awards ID System — ✅ Complete (Dec 2025)
 
-- Unique submission IDs (AW-YYYY-NNN)
-- Winner tracking in Google Sheets
+- Unique submission IDs (AW-YYYY-NNN) minted server-side
+- Winner tracking columns in the master Google Sheet
 - Confirmation email templates
-- Admin CLI tools for winner management
+- Admin CLI tools for winner management (`scripts/mark-winner.py`, `scripts/export-winners-teams.py`)
 - Project team extraction and export
 
-### Phase 2: Admin Portal — ✅ Prototype Deployed (Dec 2025)
+### Phase 2: Admin Portal — Read-only deployed; write flows on hold
 
-- Admin dashboard at `/admin`
+- Admin dashboard at `/admin` (unauthenticated — see below)
 - Submissions list with filtering and search
 - Submission detail view
-- Winner marking UI (functional wiring pending)
-- **Pending:** Authentication, winner marking → Sheet updates
+- **On hold:**
+  - Authentication — awaiting client decision on auth method
+  - Winner marking through the portal — awaiting client decision on whether the portal (vs. CLI) should own winner management. Detail-view Mark/Unmark buttons are present but not wired to a write endpoint.
 
-### Phase 3: Survey Module — Planned (Q1 2026)
+### Phase 3: Survey Module — ✅ Deployed
 
-- Survey creation web interface
-- Recipient list upload (CSV)
-- Unique links per firm, email distribution
-- Response tracking and reminders
-- Export to magazine format (see `docs/surveys/Survey_Sorting_Rules.md`)
+Live surveys with per-firm unique links, response tracking, reminder history, submission-copy emails (with PDF attachment), and RTF export to magazine format. See `docs/surveys/Survey_Sorting_Rules.md` for the export column spec. Ongoing work is client-driven refinements (template additions, formatting tweaks) rather than net-new capability.
 
-### Phase 4: Polish — Planned (Q1 2026)
+### Confirmation email (Awards) — ✅ Sending
 
-- Full testing, UX refinements
-- April 2026 survey season launch
-
----
-
-## Implementation Timeline
-
-| Phase | Duration | Deliverable |
-|-------|----------|-------------|
-| Phase 1 | 2 weeks | Awards ID system |
-| Phase 2 | 3 weeks | Admin portal with auth |
-| Phase 3 | 4 weeks | Survey MVP |
-| Phase 4 | 3 weeks | Testing and polish |
-| **Total** | **12 weeks** | Ready April 2026 |
+The PDF-processor Cloud Function sends a plain-text confirmation email to the submitter's contact address via SMTP (Resend). Failures are logged and never block a submission.
 
 ---
 
@@ -90,11 +76,11 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 Submitter → Web Form → GCS → Cloud Function (PDF extract) → Drive + Sheet
 ```
 
-### Future Survey Flow
+### Survey Flow (deployed)
 
 ```
 Admin Creates Survey → Upload Recipients → System Sends Unique Links
-→ Recipients Respond → Real-Time Tracking → Export Rankings
+→ Recipients Respond → Real-Time Tracking → RTF Export for Magazine
 ```
 
 ---
@@ -118,5 +104,5 @@ Admin Creates Survey → Upload Recipients → System Sends Unique Links
 
 ## Related Documentation
 
-- **Deployment:** [docs/deployment/DEPLOYMENT.md](deployment/DEPLOYMENT.md)
+- **Deployment:** [docs/DEPLOYMENT.md](DEPLOYMENT.md)
 - **Survey export rules:** [docs/surveys/Survey_Sorting_Rules.md](surveys/Survey_Sorting_Rules.md)

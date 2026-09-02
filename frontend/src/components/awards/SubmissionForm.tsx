@@ -7,8 +7,6 @@ import { v4 as uuidv4 } from 'uuid';
 interface SubmissionStatus {
   status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
   message?: string;
-  submissionId?: string;
-  driveLink?: string;
 }
 
 export default function SubmissionForm() {
@@ -71,7 +69,6 @@ export default function SubmissionForm() {
       setSubmissionStatus({
         status: 'success',
         message: 'Submission successful!',
-        submissionId,
       });
 
     } catch (error: any) {
@@ -195,9 +192,15 @@ export default function SubmissionForm() {
         <h3 className="text-2xl font-bold text-gray-900 mb-2">
           Submission Successful!
         </h3>
-        <p className="text-gray-600 mb-4">{submissionStatus.message}</p>
-        <p className="text-sm text-gray-500 mb-6">
-          Submission ID: <code className="bg-gray-100 px-2 py-1 rounded">{submissionStatus.submissionId}</code>
+        <p className="text-gray-600 mb-4">
+          A confirmation email with your Awards ID (format <code className="bg-gray-100 px-1.5 py-0.5 rounded text-sm">AW-YYYY-NNN</code>) has been sent to the contact address on your submission form. Please keep it for your records.
+        </p>
+        <p className="text-xs text-gray-400 mb-6">
+          Not seeing it after a few minutes? Check your spam folder or contact{' '}
+          <a href="mailto:lmarshall@utahcdmag.com" className="underline">
+            lmarshall@utahcdmag.com
+          </a>
+          .
         </p>
         <button
           onClick={handleReset}
@@ -232,7 +235,7 @@ export default function SubmissionForm() {
       {/* Photo Upload */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
-          Project Photos * (Unlimited)
+          Project Photos *
         </label>
         <FileUpload
           accept="image/*"
