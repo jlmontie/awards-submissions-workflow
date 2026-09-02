@@ -117,6 +117,14 @@ resource "google_secret_manager_secret_iam_member" "frontend_resend_api_key" {
   member    = "serviceAccount:${google_service_account.frontend.email}"
 }
 
+# Grant the backend (pdf-processor Cloud Function) the same Resend key, so it
+# can send the submitter confirmation email via SMTP.
+resource "google_secret_manager_secret_iam_member" "backend_resend_api_key" {
+  secret_id = data.google_secret_manager_secret.resend_api_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.backend.email}"
+}
+
 # Output service account emails
 output "backend_service_account_email" {
   value       = google_service_account.backend.email

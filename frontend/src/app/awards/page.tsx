@@ -45,8 +45,7 @@ export default function AwardsPage() {
             </li>
             <li>Save your completed form as a PDF</li>
             <li>
-              Upload your completed PDF form and project photos (unlimited photos
-              accepted)
+              Upload your completed PDF form and project photos
             </li>
             <li>Submit your entry - you&apos;ll receive a confirmation</li>
           </ol>
@@ -115,10 +114,10 @@ export default function AwardsPage() {
           <p className="text-base font-light text-gray-500">
             Need help? Contact us at{' '}
             <a
-              href="mailto:awards@example.com"
+              href="mailto:lmarshall@utahcdmag.com"
               className="text-charcoal-500 font-normal hover:text-secondary-400 transition-colors"
             >
-              awards@example.com
+              lmarshall@utahcdmag.com
             </a>
           </p>
         </footer>

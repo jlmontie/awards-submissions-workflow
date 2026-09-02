@@ -58,6 +58,15 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
       SUBMISSIONS_BUCKET      = google_storage_bucket.submissions.name
       MAX_PDF_SIZE_MB         = var.max_pdf_size_mb
       DRIVE_OWNER_EMAIL       = var.drive_owner_email
+
+      # SMTP for the submitter confirmation email. Same Resend gateway the
+      # frontend uses for survey mail; password read from Secret Manager by
+      # the function itself (see get_secret / SMTP_PASS_SECRET).
+      SMTP_HOST        = var.smtp_host
+      SMTP_PORT        = tostring(var.smtp_port)
+      SMTP_USER        = var.smtp_user
+      SMTP_FROM        = var.smtp_from != "" ? var.smtp_from : var.smtp_user
+      SMTP_PASS_SECRET = data.google_secret_manager_secret.resend_api_key.secret_id
     }
   }
 
@@ -66,7 +75,7 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
     event_type            = "google.cloud.storage.object.v1.finalized"
     retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"  # No automatic retries - fail fast to save costs
     service_account_email = google_service_account.backend.email
-    
+
     event_filters {
       attribute = "bucket"
       value     = google_storage_bucket.submissions.name
