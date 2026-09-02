@@ -75,6 +75,18 @@ resource "google_storage_bucket" "public_assets" {
   }
 }
 
+# The blank form the submissions portal hands out, served by the frontend's
+# /api/awards/download-form route. Managed here so what the public downloads is
+# always what is checked in; regenerate the PDF itself with
+# scripts/build-fillable-submission-form.py. The object name is fixed rather
+# than content-hashed because the route looks it up by that exact path.
+resource "google_storage_bucket_object" "blank_submission_form" {
+  name         = "blank-submission-form.pdf"
+  bucket       = google_storage_bucket.public_assets.name
+  source       = "${path.module}/../docs/forms/blank-submission-form.pdf"
+  content_type = "application/pdf"
+}
+
 # Make public assets bucket publicly readable
 resource "google_storage_bucket_iam_member" "public_assets_viewer" {
   bucket = google_storage_bucket.public_assets.name

@@ -38,6 +38,15 @@ SMTP_USER = os.environ.get('SMTP_USER')
 SMTP_PASS_SECRET = os.environ.get('SMTP_PASS_SECRET')  # Secret Manager name holding SMTP password
 SMTP_FROM = os.environ.get('SMTP_FROM') or SMTP_USER
 
+# Project category checkboxes on the submission form, one per category
+CATEGORY_FIELD_PREFIX = 'Category: '
+CATEGORY_OTHER = 'Other'
+CATEGORY_OTHER_FIELD = 'Category Other Specify'
+# Free-text field used by forms issued before the checkboxes were added
+LEGACY_CATEGORY_FIELD = 'Project Category or Categories for Consideration'
+# A checkbox PyPDF2 reports with any of these is not ticked
+CHECKBOX_OFF_VALUES = {'', '/Off', 'Off', 'None'}
+
 # Initialize clients
 storage_client = storage.Client()
 secret_client = secretmanager.SecretManagerServiceClient()
@@ -145,6 +154,47 @@ def extract_pdf_fields(pdf_bytes: bytes) -> Dict[str, Any]:
         return {'_error': str(e)}
 
 
+def extract_project_categories(fields: Dict[str, Any]) -> str:
+    """
+    Collect the project categories selected on the submission form.
+
+    The form used to carry a single free-text line. It now carries one checkbox
+    per category, named "Category: <name>", plus an "Other" checkbox with a
+    companion text field. Submissions made on the older form fall back to the
+    original free-text field so they keep parsing.
+
+    Args:
+        fields: Dictionary of all PDF form fields
+
+    Returns:
+        Selected categories joined with "; ", e.g.
+        "K-12; Green/Sustainable; Other: Parks & Recreation"
+    """
+    selected = []
+    other_checked = False
+
+    for field_name, value in fields.items():
+        if not field_name.startswith(CATEGORY_FIELD_PREFIX):
+            continue
+        if str(value).strip() in CHECKBOX_OFF_VALUES:
+            continue
+        category = field_name[len(CATEGORY_FIELD_PREFIX):]
+        if category == CATEGORY_OTHER:
+            other_checked = True  # appended below so it always sorts last
+        else:
+            selected.append(category)
+
+    other_text = str(fields.get(CATEGORY_OTHER_FIELD, '')).strip()
+    if other_checked or other_text:
+        # Take the typed category even if the box itself was left unticked
+        selected.append(f'Other: {other_text}' if other_text else CATEGORY_OTHER)
+
+    if selected:
+        return '; '.join(selected)
+
+    return str(fields.get(LEGACY_CATEGORY_FIELD, '')).strip()
+
+
 def extract_project_team(fields: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
     """
     Extract and structure project team member information from PDF fields.
@@ -185,7 +235,7 @@ def extract_project_team(fields: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
         'project_info': {
             'name': fields.get('Official Name', ''),
             'location': fields.get('Location', ''),
-            'category': fields.get('Project Category or Categories for Consideration', ''),
+            'category': extract_project_categories(fields),
             'cost': fields.get('Cost', ''),
             'date_completed': fields.get('Date Completed', ''),
             'square_feet': fields.get('Square Feet', ''),
@@ -503,7 +553,7 @@ Please save this ID for your records. You can reference it if you need to contac
 SUBMISSION DETAILS:
 -------------------
 Project: {project_name}
-Category: {fields.get('Project Category or Categories for Consideration', 'Not specified')}
+Category: {extract_project_categories(fields) or 'Not specified'}
 Submitted: {submission_date}
 Status: Under Review
 
@@ -711,7 +761,7 @@ def process_pdf(cloud_event):
             f"https://drive.google.com/drive/folders/{project_folder_id}",  # Project Folder
             fields.get('Official Name', ''),                                 # Official Name
             fields.get('Location', ''),                                      # Location
-            fields.get('Project Category or Categories for Consideration', ''),  # Project Category
+            extract_project_categories(fields),                              # Project Category
             fields.get('Cost', ''),                                          # Cost
             fields.get('Date Completed', ''),                                # Date Completed
             fields.get('Delivery Method', ''),                               # Delivery Method

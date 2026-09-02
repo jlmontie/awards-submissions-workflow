@@ -71,8 +71,9 @@ output "next_steps" {
     2. Share Google Drive/Sheets with service account:
        ${google_service_account.backend.email}
 
-    3. Upload blank PDF form:
-       gsutil cp example-filled-submission-form.pdf gs://${google_storage_bucket.public_assets.name}/blank-submission-form.pdf
+    3. The blank submission form is uploaded by terraform from
+       docs/forms/blank-submission-form.pdf. To publish a new one, rebuild it
+       with scripts/build-fillable-submission-form.py and apply again.
 
     4. Application URL:
        ${google_cloud_run_v2_service.frontend.uri}
