@@ -19,6 +19,7 @@ env/
 *.tfstate
 *.tfstate.backup
 .terraform.lock.hcl
+*.tfplan
 
 # Build outputs
 .next/
@@ -31,6 +32,7 @@ out/
 .idea/
 *.swp
 *.swo
+*.code-workspace
 .DS_Store
 
 # Logs
