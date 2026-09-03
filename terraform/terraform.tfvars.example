@@ -52,3 +52,25 @@ smtp_user = "you@yourcompany.com"
 smtp_from = "you@yourcompany.com"         # Optional; defaults to smtp_user
 app_url   = "https://awards.yourcompany.com"
 
+# Admin Portal Sign-In (NextAuth + Google)
+# ----------------------------------------
+# The admin portal at /admin is gated by Google Sign-In. Users must have a
+# Google account tied to one of the emails listed below.
+#
+# One-time setup in the Google Cloud Console (Terraform can't create standard
+# OAuth clients — only IAP):
+#   1. APIs & Services > OAuth consent screen: User type "External",
+#      add "utahcdmag.com" as an Authorized domain, publish the app.
+#   2. APIs & Services > Credentials > Create OAuth client ID:
+#        - Application type: Web application
+#        - Authorized redirect URIs:
+#            https://awards.utahcdmag.com/api/auth/callback/google
+#            http://localhost:3000/api/auth/callback/google   (dev, optional)
+#   3. Copy the Client ID and Client secret into the two vars below.
+#
+# If any listed email isn't already a Google account, the owner needs to sign
+# up once at https://accounts.google.com/signup using that address.
+google_oauth_client_id     = "1234567890-abc.apps.googleusercontent.com"
+google_oauth_client_secret = "GOCSPX-xxxxxxxxxxxxxxxxx"
+admin_allowed_emails       = ["you@utahcdmag.com", "client@utahcdmag.com"]
+

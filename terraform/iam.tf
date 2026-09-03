@@ -117,6 +117,20 @@ resource "google_secret_manager_secret_iam_member" "frontend_resend_api_key" {
   member    = "serviceAccount:${google_service_account.frontend.email}"
 }
 
+# Grant frontend access to the Google OAuth client secret (admin sign-in).
+resource "google_secret_manager_secret_iam_member" "frontend_google_oauth_client_secret" {
+  secret_id = google_secret_manager_secret.google_oauth_client_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.frontend.email}"
+}
+
+# Grant frontend access to the NextAuth session-signing secret.
+resource "google_secret_manager_secret_iam_member" "frontend_nextauth_secret" {
+  secret_id = google_secret_manager_secret.nextauth_secret.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.frontend.email}"
+}
+
 # Grant the backend (pdf-processor Cloud Function) the same Resend key, so it
 # can send the submitter confirmation email via SMTP.
 resource "google_secret_manager_secret_iam_member" "backend_resend_api_key" {

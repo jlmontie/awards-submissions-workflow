@@ -2,12 +2,12 @@
 resource "google_cloud_run_v2_service" "frontend" {
   name     = "${local.shared_prefix}-frontend"
   location = var.region
-  
+
   labels = local.common_labels
 
   template {
     service_account = google_service_account.frontend.email
-    
+
     scaling {
       min_instance_count = 0
       max_instance_count = 10
@@ -121,6 +121,43 @@ resource "google_cloud_run_v2_service" "frontend" {
       env {
         name  = "APP_URL"
         value = var.app_url
+      }
+
+      # NextAuth admin sign-in (Google provider). NEXTAUTH_URL is required so
+      # NextAuth builds correct absolute callback URLs behind Cloud Run's proxy.
+      env {
+        name  = "NEXTAUTH_URL"
+        value = var.app_url
+      }
+
+      env {
+        name = "NEXTAUTH_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.nextauth_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "GOOGLE_CLIENT_ID"
+        value = var.google_oauth_client_id
+      }
+
+      env {
+        name = "GOOGLE_CLIENT_SECRET"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.google_oauth_client_secret.secret_id
+            version = "latest"
+          }
+        }
+      }
+
+      env {
+        name  = "ADMIN_ALLOWED_EMAILS"
+        value = join(",", var.admin_allowed_emails)
       }
 
       env {

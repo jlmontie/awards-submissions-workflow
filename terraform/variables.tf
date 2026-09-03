@@ -123,3 +123,28 @@ variable "app_url" {
   default     = ""
 }
 
+# NextAuth / Google Sign-In configuration for the admin portal.
+# The OAuth 2.0 Client ID and secret are created manually in the Google Cloud
+# Console (APIs & Services > Credentials > Create OAuth client ID > Web
+# application) — Terraform's google provider has no resource for standard
+# OAuth clients (only IAP). The authorized redirect URI must be
+# "${app_url}/api/auth/callback/google".
+variable "google_oauth_client_id" {
+  description = "Google OAuth 2.0 Web Client ID for admin sign-in"
+  type        = string
+  default     = ""
+}
+
+variable "google_oauth_client_secret" {
+  description = "Google OAuth 2.0 Web Client secret for admin sign-in"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "admin_allowed_emails" {
+  description = "Emails allowed to sign in to the admin portal. Exact match, case-insensitive."
+  type        = list(string)
+  default     = []
+}
+
