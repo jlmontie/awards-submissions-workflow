@@ -61,6 +61,9 @@ SUBHEAD = "(Check every category in which this project should be considered)"
 # Conferred by the publisher rather than entered into, so not self-selectable.
 EXCLUDED = {"Project of the Year", "Publisher's Pick"}
 
+# Stroke width that lifts the stand-in DIN-Medium 6 to DIN-Bold weight at 18pt.
+MASTHEAD_STROKE = 0.45
+
 # The form sets every labelled row on a 19pt baseline grid.
 ROW_PITCH = 19.0008
 
@@ -112,9 +115,62 @@ def fix_fee(data):
     return data[:i] + "[-1668<" + data[i + 13:j] + ">]TJ" + data[j + 3:]
 
 
+def fix_year(data):
+    """2025 -> 2026 in the page 1 masthead.
+
+    The masthead is set in a DIN-Bold subset carrying only the digits 0, 2 and
+    5, and no other DIN-*Bold* subset in the file has a 6 either. The closest
+    thing available is the DIN-Medium 6 the footers use, so it is drawn in place
+    of the 5, widened from its 533 units to DIN-Bold's 543 with Tz, and stroked
+    to bring it from Medium up to Bold weight. Same family and letterform; only
+    the weight is synthesised. Helvetica-Bold was the alternative and reads as
+    plainly the wrong typeface next to the DIN digits.
+    """
+    return replace_once(
+        data, "<04AC04AA04AC04AF>Tj",
+        "<04AC04AA04AC>Tj /T1_2 18 Tf 101.876 Tz 0 G {:g} w 2 Tr (\\034)Tj "
+        "0 Tr 100 Tz /C0_0 18 Tf".format(MASTHEAD_STROKE))
+
+
+def fix_deadline_page1(data):
+    """October 16th -> October 15th on page 1.
+
+    The original sets "October 1", switches to an Arial-Bold subset for the 6
+    alone, then switches back for "th.". Helvetica-Bold carries both digits at
+    the same 556 advance, so the whole run collapses into one show operator.
+    """
+    return replace_once(
+        data,
+        "(October 1)Tj\n/C2_1 10.7 Tf\n<0019>Tj\n/TT0 10.7 Tf\n(th.)Tj",
+        "(October 15th.)Tj")
+
+
+def fix_footer_deadline(data):
+    """October 16th -> October 15th in a page footer.
+
+    The footers set the date in a DIN-Medium CID subset that has a 6 but no 5.
+    The same page's other DIN-Medium subset does carry a 5, at the same 533
+    advance, so the digit is drawn from there and the run switches straight back.
+    """
+    return replace_once(data, "<04B0>Tj", "/T1_0 8 Tf (\\035)Tj\n/C0_0 8 Tf")
+
+
+def fix_page1_text(data):
+    return fix_deadline_page1(fix_year(fix_fee(data)))
+
+
+def compose(*fns):
+    def run(data):
+        for fn in fns:
+            if fn is not None:
+                data = fn(data)
+        return data
+    return run
+
+
 def edit_page1_stream(data):
-    """Fee, plus swapping the category rule for a pointer at the block."""
-    data = fix_fee(data)
+    """Fee and dates, plus swapping the category rule for a pointer at the block."""
+    data = fix_page1_text(data)
 
     # The rule following "Project Category or Categories for Consideration:".
     # The trailing Td is relative to the line matrix, not the pen, so dropping
@@ -536,8 +592,9 @@ def carve_page2(data):
 
 def reflow(writer, reader):
     p1, p2 = writer.pages[0], writer.pages[1]
-    new_p1, team_src = carve_page1(fix_fee(page_stream(p1)))
+    new_p1, team_src = carve_page1(fix_page1_text(page_stream(p1)))
     new_p2, trades_src = carve_page2(page_stream(p2))
+    new_p2 = fix_footer_deadline(new_p2)
 
     team_x = make_form_xobject(
         writer, "/CS0 cs 0 0 0 scn\n/GS0 gs\n0 Tc 0 Tw\n" + team_src,
@@ -554,7 +611,7 @@ def reflow(writer, reader):
     append_content(writer, page,
                    "q 1 0 0 1 0 {:.4f} cm /FmTeam Do Q\n"
                    "q 1 0 0 1 0 {:.4f} cm /FmTrades Do Q\n".format(TEAM_DY, TRADES_DY),
-                   rewrite=strip_page5_heading)
+                   rewrite=compose(strip_page5_heading, fix_footer_deadline))
 
     # follow the rows with their widgets
     def nudge(annot, dy, to_page=None):
@@ -588,6 +645,7 @@ def reflow(writer, reader):
     overview[0][NameObject("/Rect")] = rect(35.6, 55.4, 575.9, 732.0)
 
     append_content(writer, p2, "", rewrite=lambda _: new_p2)
+    append_content(writer, writer.pages[4], "", rewrite=fix_footer_deadline)
 
     # a section divider above the category block, matching the other three
     y = 335.0 + ROW_PITCH
@@ -667,17 +725,21 @@ def main():
         p2 = writer.pages[1]
         add_page_fonts(writer, p2, {"/XHelvO": helv_o})
         append_content(writer, p2, show(201.464, 756.35, "1", "/XHelvO", 8, thin=0.22),
-                       rewrite=edit_page2_stream)
+                       rewrite=compose(edit_page2_stream, fix_footer_deadline))
 
         # Clone page 5 so the new page inherits its footer, rules and fonts,
         # then strip the essay heading and its widget back off.
         page = writer.add_page(reader.pages[4])
         if "/Annots" in page:
             del page[NameObject("/Annots")]
-        rewrite, existing_annots = strip_page5_heading, []
+        append_content(writer, writer.pages[4], "", rewrite=fix_footer_deadline)
+        rewrite = compose(strip_page5_heading, fix_footer_deadline)
+        existing_annots = []
     else:
+        append_content(writer, writer.pages[1], "", rewrite=fix_footer_deadline)
         page = writer.pages[4]
-        rewrite, existing_annots = None, list(page.raw_get("/Annots").get_object())
+        rewrite = fix_footer_deadline
+        existing_annots = list(page.raw_get("/Annots").get_object())
 
     add_page_fonts(writer, page, {"/XHelv": helv, "/XHelvB": helv_b, "/XHelvO": helv_o})
 
