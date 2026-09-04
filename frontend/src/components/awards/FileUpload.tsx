@@ -73,7 +73,7 @@ export default function FileUpload({
                 select
               </p>
               <p className="text-sm text-gray-500">
-                {multiple ? `Up to ${maxFiles} files` : '1 file only'}
+                {multiple ? `Up to 30 files` : '1 file only'}
               </p>
             </>
           )}
