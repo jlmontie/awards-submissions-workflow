@@ -118,12 +118,19 @@ export default function EmailComposer({
     // greying out the Send button.
     const eligible = inScope.filter((r) => r.status !== 'completed' && mailable(r));
 
+    const pending = inScope.filter((r) => r.status !== 'completed');
+
     return {
       first: eligible.filter((r) => variantForStatus(r.status) === 'first').length,
       reminder: eligible.filter((r) => variantForStatus(r.status) === 'reminder').length,
       inScope: inScope.length,
       completed: inScope.filter((r) => r.status === 'completed').length,
-      noContact: inScope.filter((r) => r.status !== 'completed' && !mailable(r)).length,
+      // Split apart because the fixes differ: no contact row at all means the
+      // firm needs one in Survey Contacts (or its category/active cell is
+      // wrong), whereas a contact with a blank email means the row is there
+      // but its contact_email cell is empty.
+      noContacts: pending.filter((r) => (r.contacts || []).length === 0).length,
+      noEmail: pending.filter((r) => (r.contacts || []).length > 0 && !mailable(r)).length,
     };
   }, [recipients, selectedIds]);
 
@@ -133,10 +140,16 @@ export default function EmailComposer({
     if (audience.completed > 0) {
       parts.push(`${audience.completed} already completed the survey`);
     }
-    if (audience.noContact > 0) {
+    if (audience.noContacts > 0) {
       parts.push(
-        `${audience.noContact} ${audience.noContact === 1 ? 'has' : 'have'} no active contact ` +
-          `with an email address in the Survey Contacts sheet, matching this survey's category`,
+        `${audience.noContacts} ${audience.noContacts === 1 ? 'has' : 'have'} no matching row in ` +
+          `the Survey Contacts sheet (check firm_name, category and active)`,
+      );
+    }
+    if (audience.noEmail > 0) {
+      parts.push(
+        `${audience.noEmail} ${audience.noEmail === 1 ? 'has a contact' : 'have contacts'} ` +
+          `but no email address in the contact_email column`,
       );
     }
     return parts;
