@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import EmailComposer from '@/components/surveys/EmailComposer';
 
 interface Survey {
   surveyId: string;
@@ -45,7 +46,7 @@ export default function SurveyDetailPage() {
   const [importing, setImporting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expandedFirms, setExpandedFirms] = useState<Set<string>>(new Set());
-  const [actionLoading, setActionLoading] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [emailResult, setEmailResult] = useState('');
   const [notesDraft, setNotesDraft] = useState<Record<string, string>>({});
   const [notesSaving, setNotesSaving] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
@@ -147,39 +148,12 @@ export default function SurveyDetailPage() {
     }
   }
 
-  async function handleSendEmail(all: boolean) {
-    setActionLoading(true);
-    setEmailResult('');
+  async function handleSent(message: string) {
+    setComposerOpen(false);
+    setEmailResult(message);
     setError('');
-    try {
-      const body = all
-        ? { all: true }
-        : { recipientIds: Array.from(selected) };
-      const res = await fetch(`/api/surveys/admin/${surveyId}/email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to send emails');
-      }
-      const data = await res.json();
-      const parts: string[] = [];
-      if (data.sent > 0) parts.push(`sent to ${data.sent} firm${data.sent !== 1 ? 's' : ''}`);
-      if (data.reminded > 0) parts.push(`reminded ${data.reminded} firm${data.reminded !== 1 ? 's' : ''}`);
-      let msg = parts.length > 0 ? parts.join(', ') : 'No emails sent';
-      msg = msg.charAt(0).toUpperCase() + msg.slice(1);
-      if (data.skipped > 0) msg += `, ${data.skipped} skipped (no contacts)`;
-      if (data.errors?.length > 0) msg += `. Errors: ${data.errors.join('; ')}`;
-      setEmailResult(msg);
-      if (!all) setSelected(new Set());
-      await loadSurvey();
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setActionLoading(false);
-    }
+    setSelected(new Set());
+    await loadSurvey();
   }
 
   function toggleSelect(recipientId: string) {
@@ -404,21 +378,12 @@ export default function SurveyDetailPage() {
 
         {recipients.length > 0 && (
           <button
-            onClick={() => handleSendEmail(true)}
-            disabled={actionLoading}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors disabled:opacity-50"
+            onClick={() => setComposerOpen(true)}
+            className="inline-flex items-center justify-center rounded-md border border-transparent bg-navy-500 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-navy-600 transition-colors"
           >
-            {actionLoading ? 'Sending...' : 'Email All Firms'}
-          </button>
-        )}
-
-        {selected.size > 0 && (
-          <button
-            onClick={() => handleSendEmail(false)}
-            disabled={actionLoading}
-            className="inline-flex items-center justify-center rounded-md border border-transparent bg-primary-500 px-4 py-2 text-sm font-medium text-black shadow-sm hover:bg-black hover:text-white transition-colors disabled:opacity-50"
-          >
-            {actionLoading ? 'Sending...' : `Send Email (${selected.size})`}
+            {selected.size > 0
+              ? `Compose & Send (${selected.size} selected)`
+              : 'Compose & Send Email'}
           </button>
         )}
       </div>
@@ -645,6 +610,16 @@ export default function SurveyDetailPage() {
           </div>
         )}
       </div>
+
+      {composerOpen && (
+        <EmailComposer
+          surveyId={surveyId}
+          recipients={recipients}
+          selectedIds={Array.from(selected)}
+          onClose={() => setComposerOpen(false)}
+          onSent={handleSent}
+        />
+      )}
     </div>
   );
 }

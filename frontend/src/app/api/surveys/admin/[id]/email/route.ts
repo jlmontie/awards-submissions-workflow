@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { batchGetValues, getSheetsClient } from '@/lib/google-sheets';
+import {
+  EMAIL_TEMPLATE_RANGE,
+  parseTemplates,
+  saveTemplate,
+} from '@/lib/surveys/email-templates';
+import {
+  EMAIL_VARIANTS,
+  renderInvitationEmail,
+  validateTemplate,
+  variantForStatus,
+  type EmailTemplate,
+  type EmailVariant,
+} from '@/lib/surveys/invitation-email';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,214 +29,21 @@ function columnLetter(index: number): string {
   return letter;
 }
 
-function buildSubject(
-  surveyName: string,
-  deadline: string,
-  isReminder: boolean,
-): string {
-  if (isReminder) {
-    return deadline
-      ? `Reminder: ${surveyName} — Survey Closes ${deadline}`
-      : `Reminder: ${surveyName} — Please Complete Your Survey`;
-  }
-  return `${surveyName} — Please Complete Your Survey`;
-}
-
-function buildHtml(
-  contactName: string,
-  firmName: string,
-  surveyName: string,
-  deadline: string,
-  surveyUrl: string,
-  appUrl: string,
-  isReminder: boolean,
-): string {
-  let deadlineText: string;
-  if (!deadline) {
-    deadlineText = 'Please complete the survey at your earliest convenience.';
-  } else if (isReminder) {
-    deadlineText = `The survey closes on <strong>${deadline}</strong> — please submit your response before then.`;
-  } else {
-    deadlineText = `Please complete the survey by <strong>${deadline}</strong>.`;
-  }
-
-  const greeting = isReminder ? `Hi ${contactName},` : `Dear ${contactName},`;
-
-  const introHtml = isReminder
-    ? `This is a quick reminder that we haven&rsquo;t yet received your response to the <strong>${surveyName}</strong>.
-                Your input on behalf of <strong>${firmName}</strong> is important to us &mdash; completing the survey only takes a few minutes.`
-    : `We invite you to participate in the <strong>${surveyName}</strong>.
-                You are receiving this message as one of the contacts for <strong>${firmName}</strong>.`;
-
-  const closingHtml = isReminder
-    ? 'Thanks for taking the time to respond.'
-    : 'Thanks again for your consideration and support.';
-
-  // Logo served by Next.js out of frontend/public; same image as the survey
-  // header so the email matches the survey's branding. The text alt fallback
-  // ("UC+D") shows in clients that block remote images.
-  const logoUrl = `${appUrl.replace(/\/$/, '')}/ucd-logo.png`;
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="color-scheme" content="light only" />
-  <meta name="supported-color-schemes" content="light only" />
-  <title>${surveyName}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet" />
-  <style>
-    /* Tell clients we're a light-only design. Apple Mail/Outlook respect this. */
-    :root {
-      color-scheme: light only;
-      supported-color-schemes: light only;
-    }
-    /* Belt-and-suspenders: if a client still applies a dark-mode pass, force
-       the brand navy + yellow back onto the bands they live on. Without this
-       the navy footer turns near-white while the yellow text stays yellow,
-       which becomes illegible. */
-    @media (prefers-color-scheme: dark) {
-      .ucd-bg-navy { background-color: #2C3E48 !important; }
-      .ucd-text-yellow { color: #F5CF00 !important; }
-    }
-    /* Outlook 365 dark-mode attribute selectors (separate from prefers-color-scheme). */
-    [data-ogsc] .ucd-bg-navy,
-    [data-ogsb] .ucd-bg-navy { background-color: #2C3E48 !important; }
-    [data-ogsc] .ucd-text-yellow,
-    [data-ogsb] .ucd-text-yellow { color: #F5CF00 !important; }
-  </style>
-</head>
-<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Roboto,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f5;padding:32px 0;">
-    <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#ffffff;border-radius:6px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-
-          <!-- Header -->
-          <tr>
-            <td class="ucd-bg-navy" style="background-color:#2C3E48;padding:24px 32px;text-align:center;">
-              <img src="${logoUrl}" alt="UC+D" height="48" class="ucd-text-yellow" style="height:48px;width:auto;display:inline-block;border:0;outline:none;text-decoration:none;color:#F5CF00;font-family:Montserrat,Arial,sans-serif;font-size:22px;font-weight:700;letter-spacing:1px;" />
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:32px;color:#333333;font-size:15px;line-height:1.6;">
-              <p style="margin:0 0 16px 0;">${greeting}</p>
-              <p style="margin:0 0 16px 0;">
-                ${introHtml}
-              </p>
-              <p style="margin:0 0 24px 0;">${deadlineText}</p>
-
-              <!-- CTA Button -->
-              <table cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
-                <tr>
-                  <td style="border-radius:4px;background-color:#F5CF00;">
-                    <a href="${surveyUrl}"
-                       style="display:inline-block;padding:14px 32px;font-family:Montserrat,Arial,sans-serif;font-size:14px;font-weight:700;color:#000000;text-decoration:none;letter-spacing:0.5px;">
-                      Complete Your Survey
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <p style="margin:0 0 8px 0;font-size:13px;color:#666666;">
-                Or copy and paste this link into your browser:
-              </p>
-              <p style="margin:0 0 24px 0;font-size:13px;color:#2C3E48;word-break:break-all;">
-                <a href="${surveyUrl}" style="color:#2C3E48;">${surveyUrl}</a>
-              </p>
-
-              <p style="margin:0 0 16px 0;">${closingHtml}</p>
-              <p style="margin:0 0 24px 0;">
-                If you have any questions don&rsquo;t hesitate to reach out to me.
-              </p>
-
-              <!-- Signature -->
-              <p style="margin:0 0 4px 0;font-family:Montserrat,Arial,sans-serif;font-weight:700;color:#2C3E48;">Ladd Marshall</p>
-              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;font-style:italic;">Utah Construction + Design</p>
-              <p style="margin:0 0 4px 0;color:#666666;font-size:14px;">
-                M: <a href="tel:+18018723531" style="color:#666666;text-decoration:none;">801-872-3531</a>
-              </p>
-              <p style="margin:0 0 4px 0;font-size:14px;">
-                <a href="mailto:lmarshall@utahcdmag.com" style="color:#2C3E48;text-decoration:none;">lmarshall@utahcdmag.com</a>
-              </p>
-              <p style="margin:0;font-size:14px;">
-                <a href="https://www.utahcdmag.com" style="color:#2C3E48;text-decoration:none;">www.utahcdmag.com</a>
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td class="ucd-bg-navy" style="background-color:#2C3E48;padding:20px 32px;text-align:center;">
-              <p class="ucd-text-yellow" style="margin:0;font-family:Montserrat,Arial,sans-serif;font-size:13px;color:#F5CF00;font-weight:600;font-style:italic;">Utah Construction + Design</p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
-function buildText(
-  contactName: string,
-  firmName: string,
-  surveyName: string,
-  deadline: string,
-  surveyUrl: string,
-  isReminder: boolean,
-): string {
-  let deadlineText: string;
-  if (!deadline) {
-    deadlineText = 'Please complete the survey at your earliest convenience.';
-  } else if (isReminder) {
-    deadlineText = `The survey closes on ${deadline} — please submit your response before then.`;
-  } else {
-    deadlineText = `Please complete the survey by ${deadline}.`;
-  }
-
-  const greeting = isReminder ? `Hi ${contactName},` : `Dear ${contactName},`;
-
-  const intro = isReminder
-    ? `This is a quick reminder that we haven't yet received your response to the ${surveyName}. Your input on behalf of ${firmName} is important to us — completing the survey only takes a few minutes.`
-    : `We invite you to participate in the ${surveyName}. You are receiving this message as one of the contacts for ${firmName}.`;
-
-  const closing = isReminder
-    ? 'Thanks for taking the time to respond.'
-    : 'Thanks again for your consideration and support.';
-
-  return [
-    greeting,
-    '',
-    intro,
-    '',
-    deadlineText,
-    '',
-    'Complete your survey here:',
-    surveyUrl,
-    '',
-    closing,
-    '',
-    "If you have any questions don't hesitate to reach out to me.",
-    '',
-    'Ladd Marshall',
-    'Utah Construction + Design',
-    'M: 801-872-3531',
-    'lmarshall@utahcdmag.com',
-    'www.utahcdmag.com',
-  ].join('\n');
-}
-
 /**
  * POST /api/surveys/admin/[id]/email
  *
- * Send survey invitation emails to selected (or all non-completed) recipients.
- * Body: { recipientIds?: string[], all?: boolean }
+ * Send survey invitation and/or reminder emails.
+ *
+ * Body:
+ *   recipientIds?: string[]   - specific recipients (omit with all: true)
+ *   all?: boolean             - every non-completed recipient
+ *   variants?: EmailVariant[] - which of first/reminder to include
+ *                               (default: both, matching prior behavior)
+ *   template?: { first?, reminder? } - copy to use for this send, overriding
+ *                               whatever is stored for the survey
+ *   saveTemplate?: boolean    - also persist `template` as the survey's copy
+ *   testTo?: string           - send a single test message to this address and
+ *                               write nothing; requires exactly one variant
  */
 export async function POST(
   request: NextRequest,
@@ -232,16 +52,62 @@ export async function POST(
   try {
     const surveyId = params.id;
     const body = await request.json();
-    const { recipientIds, all } = body as {
+    const {
+      recipientIds,
+      all,
+      variants: rawVariants,
+      template: templateOverride,
+      saveTemplate: shouldSaveTemplate,
+      testTo,
+    } = body as {
       recipientIds?: string[];
       all?: boolean;
+      variants?: string[];
+      template?: Partial<Record<EmailVariant, EmailTemplate>>;
+      saveTemplate?: boolean;
+      testTo?: string;
     };
 
-    if (!all && (!recipientIds || recipientIds.length === 0)) {
+    const isTestSend = typeof testTo === 'string' && testTo.trim().length > 0;
+
+    if (!isTestSend && !all && (!recipientIds || recipientIds.length === 0)) {
       return NextResponse.json(
         { error: 'Provide recipientIds or set all: true' },
         { status: 400 },
       );
+    }
+
+    // Default to both variants so callers that predate this field (and the
+    // existing "Email All Firms" button) keep their old behavior.
+    const variants: EmailVariant[] = rawVariants
+      ? (rawVariants.filter((v) => (EMAIL_VARIANTS as readonly string[]).includes(v)) as EmailVariant[])
+      : [...EMAIL_VARIANTS];
+
+    if (variants.length === 0) {
+      return NextResponse.json(
+        { error: `variants must contain at least one of: ${EMAIL_VARIANTS.join(', ')}` },
+        { status: 400 },
+      );
+    }
+    if (isTestSend && variants.length !== 1) {
+      return NextResponse.json(
+        { error: 'A test send requires exactly one variant' },
+        { status: 400 },
+      );
+    }
+
+    // Validate any inline copy up front — a bad placeholder should fail the
+    // request, not go out to firms as a literal "{{typo}}".
+    if (templateOverride) {
+      const errors: string[] = [];
+      for (const variant of EMAIL_VARIANTS) {
+        const candidate = templateOverride[variant];
+        if (!candidate) continue;
+        errors.push(...validateTemplate(candidate).map((e) => `${variant}: ${e}`));
+      }
+      if (errors.length > 0) {
+        return NextResponse.json({ error: errors.join(' ') }, { status: 400 });
+      }
     }
 
     const spreadsheetId = process.env.SURVEY_SHEET_ID;
@@ -269,12 +135,14 @@ export async function POST(
 
     const sheets = await getSheetsClient();
 
-    // All three sheets in a single round trip
-    const [surveyValues, recipientValues, contactValues] = await batchGetValues(
-      sheets,
-      spreadsheetId,
-      ['Surveys!A:Z', 'Survey Recipients!A:Z', 'Survey Contacts!A:Z'],
-    );
+    // All four sheets in a single round trip
+    const [surveyValues, recipientValues, contactValues, templateValues] =
+      await batchGetValues(sheets, spreadsheetId, [
+        'Surveys!A:Z',
+        'Survey Recipients!A:Z',
+        'Survey Contacts!A:Z',
+        EMAIL_TEMPLATE_RANGE,
+      ]);
 
     // --- Survey metadata ---
     const surveyRows = surveyValues || [];
@@ -294,6 +162,13 @@ export async function POST(
     const surveyName = surveyRow[sNameCol] || 'Survey';
     const surveyCategory = surveyRow[sCategoryCol] || '';
     const surveyDeadline = surveyRow[sDeadlineCol] || '';
+
+    // --- Email copy: stored per survey, overridden by anything sent inline ---
+    const stored = parseTemplates(templateValues, surveyId);
+    const templates: Record<EmailVariant, EmailTemplate> = {
+      first: templateOverride?.first || stored.first.template,
+      reminder: templateOverride?.reminder || stored.reminder.template,
+    };
 
     // --- Contacts lookup ---
     const contactRows = contactValues || [];
@@ -324,11 +199,13 @@ export async function POST(
 
     // --- Recipients ---
     const recipientRows = recipientValues || [];
-    if (recipientRows.length < 2) {
+    // A test send only needs a recipient to borrow sample values from, so it
+    // stays available before the recipient list has been imported.
+    if (!isTestSend && recipientRows.length < 2) {
       return NextResponse.json({ error: 'No recipients found' }, { status: 404 });
     }
 
-    const rHeaders = recipientRows[0];
+    const rHeaders = recipientRows[0] || [];
     const rIdCol = rHeaders.indexOf('recipient_id');
     const rSurveyIdCol = rHeaders.indexOf('survey_id');
     const rFirmCol = rHeaders.indexOf('firm_name');
@@ -344,6 +221,7 @@ export async function POST(
       firmName: string;
       token: string;
       currentStatus: string;
+      variant: EmailVariant;
     }
     const targets: TargetRow[] = [];
 
@@ -351,13 +229,19 @@ export async function POST(
       const row = recipientRows[i];
       if (row[rSurveyIdCol] !== surveyId) continue;
       if (row[rStatusCol] === 'completed') continue;
-      if (!all && !recipientIds!.includes(row[rIdCol])) continue;
+      if (!all && recipientIds && !recipientIds.includes(row[rIdCol])) continue;
+      const variant = variantForStatus(row[rStatusCol] || '');
+      // Honors the caller's first/reminder choice on both the "all" and the
+      // explicit-recipientIds paths, so a reminders-only send can't quietly
+      // fire a first invitation at a firm that was only selected by checkbox.
+      if (!variants.includes(variant)) continue;
       targets.push({
         sheetRowIndex: i + 1,
         recipientId: row[rIdCol] || '',
         firmName: row[rFirmCol] || '',
         token: row[rTokenCol] || '',
         currentStatus: row[rStatusCol] || '',
+        variant,
       });
     }
 
@@ -370,7 +254,8 @@ export async function POST(
     });
 
     console.log(
-      `[email] SMTP transport: host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${smtpFrom} targets=${targets.length}`,
+      `[email] SMTP transport: host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${smtpFrom} ` +
+        `variants=${variants.join(',')} targets=${targets.length}${isTestSend ? ' (test)' : ''}`,
     );
 
     try {
@@ -382,6 +267,53 @@ export async function POST(
         { error: `SMTP connection/auth failed: ${err?.message}` },
         { status: 502 },
       );
+    }
+
+    // --- Test send: one message, no sheet writes ---
+    if (isTestSend) {
+      const variant = variants[0];
+      const sample = targets[0];
+      const sampleContact = sample ? (contactsByFirm[sample.firmName] || [])[0] : undefined;
+
+      const rendered = renderInvitationEmail({
+        template: templates[variant],
+        variant,
+        vars: {
+          contact_name: sampleContact?.contactName || 'Sample Contact',
+          firm_name: sample?.firmName || 'Sample Firm',
+          survey_name: surveyName,
+          deadline: surveyDeadline,
+          survey_url: `${appUrl}/surveys/${sample?.token || 'sample-token'}`,
+        },
+        appUrl,
+      });
+
+      await transporter.sendMail({
+        from: smtpFrom,
+        to: testTo!.trim(),
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+      });
+
+      console.log(`[email] Test ${variant} email sent to ${testTo!.trim()} (no rows updated)`);
+      return NextResponse.json({
+        test: true,
+        variant,
+        sentTo: testTo!.trim(),
+        subject: rendered.subject,
+        usedSampleData: !sample,
+      });
+    }
+
+    // Persist before sending so the copy survives an SMTP failure mid-batch.
+    if (shouldSaveTemplate && templateOverride) {
+      for (const variant of variants) {
+        const candidate = templateOverride[variant];
+        if (!candidate) continue;
+        await saveTemplate(sheets, spreadsheetId, surveyId, variant, candidate);
+        console.log(`[email] Saved ${variant} template for survey ${surveyId}`);
+      }
     }
 
     let sent = 0;
@@ -399,19 +331,31 @@ export async function POST(
       }
 
       const surveyUrl = `${appUrl}/surveys/${target.token}`;
-      const isReminder =
-        target.currentStatus === 'sent' || target.currentStatus === 'reminded';
+      const isReminder = target.variant === 'reminder';
       let recipientSentOk = false;
 
       for (const contact of contacts) {
         if (!contact.contactEmail) continue;
         try {
+          const rendered = renderInvitationEmail({
+            template: templates[target.variant],
+            variant: target.variant,
+            vars: {
+              contact_name: contact.contactName,
+              firm_name: target.firmName,
+              survey_name: surveyName,
+              deadline: surveyDeadline,
+              survey_url: surveyUrl,
+            },
+            appUrl,
+          });
+
           const info = await transporter.sendMail({
             from: smtpFrom,
             to: contact.contactEmail,
-            subject: buildSubject(surveyName, surveyDeadline, isReminder),
-            html: buildHtml(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, appUrl, isReminder),
-            text: buildText(contact.contactName, target.firmName, surveyName, surveyDeadline, surveyUrl, isReminder),
+            subject: rendered.subject,
+            html: rendered.html,
+            text: rendered.text,
           });
           console.log(
             `[email] Sent to ${contact.contactEmail} (firm=${target.firmName}) messageId=${info.messageId} response=${info.response}`,
