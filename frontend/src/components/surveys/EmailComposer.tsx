@@ -108,19 +108,52 @@ export default function EmailComposer({
 
   const audience = useMemo(() => {
     const scope = new Set(selectedIds);
-    const eligible = recipients.filter(
-      (r) =>
-        r.status !== 'completed' &&
-        (scope.size === 0 || scope.has(r.recipientId)) &&
-        // The send route skips firms with no mailable contact, so counting them
-        // here would promise more mail than actually goes out.
-        r.contacts.some((c) => c.contactEmail.trim()),
-    );
+    const inScope = recipients.filter((r) => scope.size === 0 || scope.has(r.recipientId));
+    const mailable = (r: AudienceRecipient) =>
+      (r.contacts || []).some((c) => (c.contactEmail || '').trim());
+
+    // The send route skips completed firms and firms with no mailable contact,
+    // so counting them here would promise more mail than actually goes out.
+    // They're reported back so a zero count explains itself instead of just
+    // greying out the Send button.
+    const eligible = inScope.filter((r) => r.status !== 'completed' && mailable(r));
+
+    const pending = inScope.filter((r) => r.status !== 'completed');
+
     return {
       first: eligible.filter((r) => variantForStatus(r.status) === 'first').length,
       reminder: eligible.filter((r) => variantForStatus(r.status) === 'reminder').length,
+      inScope: inScope.length,
+      completed: inScope.filter((r) => r.status === 'completed').length,
+      // Split apart because the fixes differ: no contact row at all means the
+      // firm needs one in Survey Contacts (or its category/active cell is
+      // wrong), whereas a contact with a blank email means the row is there
+      // but its contact_email cell is empty.
+      noContacts: pending.filter((r) => (r.contacts || []).length === 0).length,
+      noEmail: pending.filter((r) => (r.contacts || []).length > 0 && !mailable(r)).length,
     };
   }, [recipients, selectedIds]);
+
+  /** Why in-scope firms aren't being counted, for the audience step. */
+  const exclusions = useMemo(() => {
+    const parts: string[] = [];
+    if (audience.completed > 0) {
+      parts.push(`${audience.completed} already completed the survey`);
+    }
+    if (audience.noContacts > 0) {
+      parts.push(
+        `${audience.noContacts} ${audience.noContacts === 1 ? 'has' : 'have'} no matching row in ` +
+          `the Survey Contacts sheet (check firm_name, category and active)`,
+      );
+    }
+    if (audience.noEmail > 0) {
+      parts.push(
+        `${audience.noEmail} ${audience.noEmail === 1 ? 'has a contact' : 'have contacts'} ` +
+          `but no email address in the contact_email column`,
+      );
+    }
+    return parts;
+  }, [audience]);
 
   // --- Load stored copy -----------------------------------------------------
 
@@ -482,6 +515,24 @@ export default function EmailComposer({
                 Firms that have already been emailed receive the reminder; everyone else receives
                 the first invitation. Completed firms are never emailed.
               </p>
+              {exclusions.length > 0 && (
+                <p
+                  className={`mt-2 rounded-md p-2 text-xs ${
+                    audience.first + audience.reminder === 0
+                      ? 'bg-amber-50 text-amber-800'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  {audience.inScope === 0
+                    ? 'No firms are in scope.'
+                    : `Of the ${audience.inScope} firm${audience.inScope !== 1 ? 's' : ''} in scope, not counted: ${exclusions.join('; ')}.`}
+                </p>
+              )}
+              {audience.inScope > 0 && exclusions.length === 0 && audience.first + audience.reminder === 0 && (
+                <p className="mt-2 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
+                  No firms are eligible for either email.
+                </p>
+              )}
             </div>
 
             {/* Step 2 + 3 — edit and preview */}

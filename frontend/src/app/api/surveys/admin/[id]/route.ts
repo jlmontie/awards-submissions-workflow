@@ -48,7 +48,9 @@ export async function GET(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
 
-    const surveyCategory = surveyRow[sCategoryCol] || '';
+    // Normalized for comparison against the contact rows, which are also
+    // trimmed and lowercased. The raw value is what goes back in the response.
+    const surveyCategory = (surveyRow[sCategoryCol] || '').trim().toLowerCase();
 
     // Build contacts lookup by firm_name (from master list)
     const contactRows = contactValues || [];
@@ -97,7 +99,9 @@ export async function GET(
       for (let i = 1; i < recipientRows.length; i++) {
         const row = recipientRows[i];
         if (row[rSurveyIdCol] === surveyId) {
-          const firmName = row[rFirmCol] || '';
+          // Trimmed to match how contactsByFirm is keyed — a stray space in
+          // the recipient's firm_name would otherwise find no contacts.
+          const firmName = (row[rFirmCol] || '').trim();
           // reminded_at is a pipe-separated history of ISO timestamps so we
           // can render the full reminder log (not just the latest).
           const rawReminded = rRemindedAtCol !== -1 ? row[rRemindedAtCol] || '' : '';

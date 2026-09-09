@@ -160,7 +160,8 @@ export async function POST(
       return NextResponse.json({ error: 'Survey not found' }, { status: 404 });
     }
     const surveyName = surveyRow[sNameCol] || 'Survey';
-    const surveyCategory = surveyRow[sCategoryCol] || '';
+    // Normalized to match the contact rows, which are trimmed and lowercased.
+    const surveyCategory = (surveyRow[sCategoryCol] || '').trim().toLowerCase();
     const surveyDeadline = surveyRow[sDeadlineCol] || '';
 
     // --- Email copy: stored per survey, overridden by anything sent inline ---
@@ -238,7 +239,9 @@ export async function POST(
       targets.push({
         sheetRowIndex: i + 1,
         recipientId: row[rIdCol] || '',
-        firmName: row[rFirmCol] || '',
+        // Trimmed to match how contactsByFirm is keyed — a stray space here
+        // silently sent the firm down the "no contacts" skip path.
+        firmName: (row[rFirmCol] || '').trim(),
         token: row[rTokenCol] || '',
         currentStatus: row[rStatusCol] || '',
         variant,
