@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { signOut } from 'next-auth/react';
 
-export default function AdminNav() {
+export default function AdminNav({ userEmail }: { userEmail: string | null }) {
   const pathname = usePathname();
 
   const links = [
@@ -20,24 +21,40 @@ export default function AdminNav() {
               UC+D Admin
             </Link>
           </div>
-          <nav className="flex space-x-4">
-            {links.map(({ href, label }) => {
-              const isActive = pathname.startsWith(href);
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className={
-                    isActive
-                      ? 'text-primary-500 bg-white/10 px-3 py-2 rounded-md text-sm font-medium'
-                      : 'text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium'
-                  }
+          <div className="flex items-center gap-6">
+            <nav className="flex space-x-4">
+              {links.map(({ href, label }) => {
+                const isActive = pathname.startsWith(href);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={
+                      isActive
+                        ? 'text-primary-500 bg-white/10 px-3 py-2 rounded-md text-sm font-medium'
+                        : 'text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium'
+                    }
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </nav>
+            {userEmail && (
+              <div className="flex items-center gap-3 pl-6 border-l border-white/20">
+                <span className="hidden sm:inline text-sm text-gray-300" title={userEmail}>
+                  {userEmail}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: '/signin' })}
+                  className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                 >
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

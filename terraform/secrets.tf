@@ -114,6 +114,51 @@ resource "google_secret_manager_secret" "user_oauth_token" {
   depends_on = [google_project_service.required_apis]
 }
 
+# Google OAuth client secret for admin sign-in (NextAuth Google provider).
+# The client itself is created manually in the Google Cloud Console; only the
+# secret value flows through Terraform (from var.google_oauth_client_secret).
+resource "google_secret_manager_secret" "google_oauth_client_secret" {
+  secret_id = "${local.shared_prefix}-google-oauth-client-secret"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required_apis]
+}
+
+resource "google_secret_manager_secret_version" "google_oauth_client_secret_version" {
+  count       = var.google_oauth_client_secret != "" ? 1 : 0
+  secret      = google_secret_manager_secret.google_oauth_client_secret.id
+  secret_data = var.google_oauth_client_secret
+}
+
+# NextAuth session-signing secret. Random 64-byte value managed entirely by
+# Terraform — never leaves state; rotate by tainting this resource.
+resource "random_password" "nextauth_secret" {
+  length  = 64
+  special = false
+}
+
+resource "google_secret_manager_secret" "nextauth_secret" {
+  secret_id = "${local.shared_prefix}-nextauth-secret"
+
+  labels = local.common_labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.required_apis]
+}
+
+resource "google_secret_manager_secret_version" "nextauth_secret_version" {
+  secret      = google_secret_manager_secret.nextauth_secret.id
+  secret_data = random_password.nextauth_secret.result
+}
+
 # Reference the externally-managed email password secret.
 # This secret is created/rotated manually (not by Terraform) and holds the SMTP password.
 data "google_secret_manager_secret" "email_password" {
