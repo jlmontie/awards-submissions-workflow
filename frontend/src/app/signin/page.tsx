@@ -18,8 +18,7 @@ function SignInInner() {
           UC+D Admin
         </h1>
         <p className="mt-2 text-sm text-gray-600 text-center">
-          Sign in with the Google account tied to your{' '}
-          <span className="font-medium">@utahcdmag.com</span> email.
+          Sign in with your Google account.
         </p>
 
         <button
