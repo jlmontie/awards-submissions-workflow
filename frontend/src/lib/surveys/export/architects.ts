@@ -16,11 +16,13 @@ import {
   type ExportSection,
   type Firm,
   formatAddress,
+  formatCity,
   formatCount,
   formatPct,
   formatPersonName,
   formatPhone,
   formatRevenue,
+  formatTitle,
   formatWebsite,
   isTrue,
   joinProjectAndLocation,
@@ -108,7 +110,7 @@ function firmCells(firm: Firm): string[][] {
   const revPrior1 = formatRevenue(firm.revenue_prior_1, isDnd) || 'DND';
   const revPrior2 = formatRevenue(firm.revenue_prior_2, isDnd) || 'DND';
 
-  const city = (firm.city || '').trim();
+  const city = formatCity(firm.city);
   const state = normalizeState(firm.state);
   const zip = (firm.zip || '').trim();
   const cityStateZip = `${city}, ${state} ${zip}`;
@@ -130,7 +132,7 @@ function firmCells(firm: Firm): string[][] {
      formatCount(firm.num_employees), revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
     [formatAddress(firm.address), formatWebsite(firm.website), '',
-     firm.top_executive_title || '', upcomingProject,
+     formatTitle(firm.top_executive_title), upcomingProject,
      formatCount(firm.num_licensed_architects), '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', '', firm.years_at_firm || '', '',

@@ -154,12 +154,28 @@ export function formatAddress(raw: string | undefined): string {
 }
 
 /**
- * Re-normalize an executive's name at export time, dropping a trailing PE.
+ * Re-normalize an executive's name at export time, dropping credentials.
  * Same reason as `formatAddress`: the write-time normalizer only covers rows
  * submitted after it shipped.
  */
 export function formatPersonName(raw: string | undefined): string {
   return normalizers.personName(raw);
+}
+
+/**
+ * Re-normalize an executive's title at export time — the abbreviations and
+ * slash-joining the page uses. Same reason as `formatPersonName`.
+ */
+export function formatTitle(raw: string | undefined): string {
+  return normalizers.title(raw);
+}
+
+/**
+ * City names print in title case, however they were typed ('SANDY' ->
+ * 'Sandy'). Export-time only: `city` is stored as the firm entered it.
+ */
+export function formatCity(raw: string | undefined): string {
+  return normalizers.properCase(raw);
 }
 
 /**

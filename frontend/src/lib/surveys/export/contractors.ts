@@ -21,11 +21,13 @@ import {
   type ExportSection,
   type Firm,
   formatAddress,
+  formatCity,
   formatCount,
   formatPct,
   formatPersonName,
   formatPhone,
   formatRevenue,
+  formatTitle,
   formatWebsite,
   isTrue,
   joinProjectAndLocation,
@@ -171,7 +173,7 @@ function firmCells(firm: Firm): string[][] {
   const all2023 = allDuplicatesUtah ? '' : allRaw2023;
   const all2022 = allDuplicatesUtah ? '' : allRaw2022;
 
-  const city = (firm.city || '').trim();
+  const city = formatCity(firm.city);
   const state = normalizeState(firm.state);
   const zip = (firm.zip || '').trim();
   const cityStateZip = `${city}, ${state} ${zip}`;
@@ -192,7 +194,7 @@ function firmCells(firm: Firm): string[][] {
     [firm.firm_name || '', firm.year_founded || '', formatPersonName(firm.top_executive),
      completedProject, ut2024, ut2023, ut2022,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
-    [formatAddress(firm.address), employees, firm.top_executive_title || '',
+    [formatAddress(firm.address), employees, formatTitle(firm.top_executive_title),
      upcomingProject, all2024, all2023, all2022,
      topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', firm.years_at_firm || '',
