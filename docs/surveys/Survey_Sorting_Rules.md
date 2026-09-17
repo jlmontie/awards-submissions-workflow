@@ -62,22 +62,22 @@ These are the top 3 markets for respondent. The first column is the name of the 
 # Engineering Survey Rules
 The engineering rankings use the **GC page layout, not the architect one** — a 5-line per-firm block, 10 columns — and split into discipline lists. The reference is the printed page in the September 2025 issue, pages 70–76 (pages 36–39 of the PDF spread). The formatting rules above (thousands separators, bare-domain websites, dash-formatted phone numbers, Utah-stripped project locations) apply unchanged.
 
-## Sections
-One list per table on the printed page. A single submission feeds several of them:
+## One File, Four Tables
+The export is a **single document** — the editor forwards one asset to the designer, so the tables must not be split across a zip. It holds the four tables in the order they run in print, each repeating the column heads and numbering its own firms from 1:
 
-| Section | Contents |
-|---|---|
-| Top Overall | every Utah firm, all disciplines |
-| Top Civil | `discipline_civil` |
-| Top MEP (Mechanical + Electrical) | `discipline_mep` |
-| Top Structural | `discipline_structural` |
+| # | Table | Contents |
+|---|---|---|
+| 1 | Top Overall Engineering Firms (Ranked by Total Office Revenues; All Disciplines) | every firm |
+| 2 | Top Civil Engineering Firms | `discipline_civil` |
+| 3 | Top MEP (Mechanical + Electrical) Engineering Firms | `discipline_mep` |
+| 4 | Top Structural Engineering Firms | `discipline_structural` |
 
-The Discipline section of the form exists to route firms into these lists — it is the only thing those checkboxes are for. A discipline nobody selected is skipped rather than printed empty.
+The title and intro run once, above the first table. A firm appears in the overall table and again in each discipline it selected — that is what the form's Discipline checkboxes are for, and the only thing they are for. A discipline nobody selected is skipped rather than set as an empty table under a heading.
 
 ## Sorting Rules
-- Within each section, revenue-disclosing firms sort by the most recent year's revenue, descending, and are **numbered 1..n**. Each discipline list is numbered from 1 in its own right; it does not carry the overall position.
-- Firms that do not report revenue follow in an unnumbered DND block within the same section, sorted by number of employees, under the heading "Firms that Did Not Disclose Revenues (listed by # of employees)".
-- An out-of-state section still exists but has never fired: firms enter the address of the Utah office they are reporting for, so `state` reads `UT` even for a national firm. The printed page ranks the nationals (AECOM, WSP, Kimley-Horn, Michael Baker, Terracon) inline in the main list, which is what the current behaviour produces.
+- Within each table, revenue-disclosing firms sort by the most recent year's revenue, descending, and are **numbered 1..n**. Each discipline table is numbered from 1 in its own right; it does not carry the overall position.
+- Firms that do not report revenue follow in an unnumbered DND block within the same table, sorted by number of employees, under the heading "Firms that Did Not Disclose Revenues (listed by # of employees)". Each table gets its own DND block.
+- **Firms headquartered outside Utah rank inline with everyone else**, on their Utah office revenues — as they do in print, where AECOM, WSP, Kimley-Horn, Michael Baker and Terracon all sit in the main list. There is no separate out-of-state file. The city line still carries the firm's real state, so an out-of-state entry is visible to editorial without being segregated.
 
 ## Block Layout
 The leftmost column stacks five lines; the rest hang off the first two.

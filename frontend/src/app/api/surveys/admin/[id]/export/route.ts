@@ -19,9 +19,12 @@ export const runtime = 'nodejs';
  *   ?section=KEY   → just that section as a downloadable .rtf
  *   (default)      → first section as a downloadable .rtf
  *
- * Sections returned depend on the survey's template: architects and engineers
- * yield up to Utah + Out-of-State; contractors yield up to GC Overall +
- * Out-of-State + General Builders + Heavy/Highway & Muni/Utility.
+ * Sections returned depend on the survey's template: architects yield up to
+ * Utah + Out-of-State; contractors yield up to GC Overall + Out-of-State +
+ * General Builders + Heavy/Highway & Muni/Utility; engineers yield exactly
+ * one section — the whole list, all four discipline tables in print order, as
+ * a single file for the editor to forward to the designer. With one section
+ * the zip is redundant and the results UI hides it (`sections.length > 1`).
  */
 export async function GET(
   request: NextRequest,

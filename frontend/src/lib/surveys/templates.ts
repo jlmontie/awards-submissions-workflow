@@ -217,7 +217,7 @@ export const engineerSurveyTemplate: SurveyTemplate = {
       title: 'General Company Information',
       fields: [
         { key: 'firm_name', label: 'Name of Firm', type: 'text', required: true, normalize: 'trim' },
-        { key: 'location', label: 'Location', type: 'text', required: true, half: true, normalize: 'trim' },
+        { key: 'location', label: 'Utah Headquarters or Main Utah Office', type: 'text', required: true, half: true, placeholder: 'e.g., Salt Lake City', normalize: 'trim' },
         { key: 'year_founded', label: 'Year Founded', type: 'number', required: true, half: true },
         { key: 'top_executive', label: 'Top Executive', type: 'text', required: true, half: true, normalize: 'personName' },
         { key: 'top_executive_title', label: 'Title', type: 'text', required: true, half: true, normalize: 'trim' },
