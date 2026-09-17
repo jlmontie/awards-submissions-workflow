@@ -61,8 +61,11 @@ describe('website normalizer', () => {
     expect(normalizers.website('okland.com')).toBe('okland.com');
   });
 
-  it('keeps a path but drops the trailing slash', () => {
-    expect(normalizers.website('https://www.okland.com/about/Team/')).toBe('okland.com/about/Team');
+  // The column points at the firm, not at a page. Terracon submitted
+  // 'terracon.com/offices/salt-lake-city' and editorial cut it to the domain.
+  it('drops the path', () => {
+    expect(normalizers.website('https://www.okland.com/about/Team/')).toBe('okland.com');
+    expect(normalizers.website('terracon.com/offices/salt-lake-city')).toBe('terracon.com');
   });
 
   it('passes blanks through', () => {
@@ -106,19 +109,91 @@ describe('personName normalizer', () => {
     expect(normalizers.personName('Mark Freeman, pe')).toBe('Mark Freeman');
   });
 
-  it('leaves credentials that actually distinguish someone', () => {
-    expect(normalizers.personName('Justin Naser, SE')).toBe('Justin Naser, SE');
-    expect(normalizers.personName('Michael Nadeau, PLS')).toBe('Michael Nadeau, PLS');
+  // Editorial's pass over the 2026 export cut all of these, not just PE.
+  it('drops a whole run of credentials', () => {
+    expect(normalizers.personName('Brent Crowther, PE, PTOE, RSP1')).toBe('Brent Crowther');
+    expect(normalizers.personName('Scott Wilson, SE')).toBe('Scott Wilson');
+    expect(normalizers.personName('Justin Naser, SE')).toBe('Justin Naser');
+    expect(normalizers.personName('Michael Nadeau, PLS')).toBe('Michael Nadeau');
+  });
+
+  it('folds a shouted name', () => {
+    expect(normalizers.personName('JARED FORD')).toBe('Jared Ford');
+  });
+
+  // A job title typed into the name box is a data-entry problem, not a
+  // credential. It survives so editorial can see it and fix the response.
+  it('keeps a non-credential part it cannot account for', () => {
+    expect(normalizers.personName('JARED FORD, PE, PRINIPAL')).toBe('Jared Ford, Prinipal');
   });
 
   it('does not chew into a surname ending in those letters', () => {
     expect(normalizers.personName('Anne Poe')).toBe('Anne Poe');
     expect(normalizers.personName('Marc Dupre')).toBe('Marc Dupre');
+    expect(normalizers.personName('Sarah Rasmussen')).toBe('Sarah Rasmussen');
   });
 
   it('passes a plain name and a blank through', () => {
     expect(normalizers.personName('Bryan Foote')).toBe('Bryan Foote');
     expect(normalizers.personName('')).toBe('');
+  });
+});
+
+describe('title normalizer', () => {
+  // Every case here is an edit editorial made by hand to the 2026 export.
+  it('joins two titles with a slash', () => {
+    expect(normalizers.title('President & CEO')).toBe('President/CEO');
+    expect(normalizers.title('President and CEO')).toBe('President/CEO');
+    expect(normalizers.title('President - CEO')).toBe('President/CEO');
+  });
+
+  it('abbreviates the long forms the page sets short', () => {
+    expect(normalizers.title('Senior Vice President')).toBe('Sr. Vice President');
+    expect(normalizers.title('Regional Chief Executive')).toBe('Reg. Chief Executive');
+    expect(normalizers.title('Local Business Leader')).toBe('Local Bus. Leader');
+    expect(normalizers.title('Principal in Charge')).toBe('Principal-in-Charge');
+  });
+
+  // 'Senior Principal' ran in full on both the 2025 and 2026 pages.
+  it('shortens Senior only where the page shortens it', () => {
+    expect(normalizers.title('Senior Principal')).toBe('Senior Principal');
+  });
+
+  it('folds a shouted title without flattening acronyms', () => {
+    expect(normalizers.title('PRESIDENT')).toBe('President');
+    expect(normalizers.title('PRESIDENT/CEO')).toBe('President/CEO');
+    expect(normalizers.title('CEO')).toBe('CEO');
+    expect(normalizers.title('COO')).toBe('COO');
+  });
+
+  it('drops a credential that leads the title', () => {
+    expect(normalizers.title('P.E., COO')).toBe('COO');
+    expect(normalizers.title('PE, President')).toBe('President');
+  });
+
+  // Blanking the column would lose more than the credential costs.
+  it('keeps a title that is nothing but a credential', () => {
+    expect(normalizers.title('P.E.')).toBe('P.E.');
+  });
+
+  it('leaves an already-clean title alone', () => {
+    expect(normalizers.title('Vice President')).toBe('Vice President');
+    expect(normalizers.title('Managing Partner')).toBe('Managing Partner');
+    expect(normalizers.title('Principal-in-Charge')).toBe('Principal-in-Charge');
+    expect(normalizers.title('Senior Principal')).toBe('Senior Principal');
+    expect(normalizers.title('')).toBe('');
+  });
+});
+
+describe('properCase normalizer', () => {
+  it('folds a shouted city', () => {
+    expect(normalizers.properCase('SANDY')).toBe('Sandy');
+    expect(normalizers.properCase('SALT LAKE CITY')).toBe('Salt Lake City');
+  });
+
+  it('leaves a normally-cased value and a known acronym alone', () => {
+    expect(normalizers.properCase('Salt Lake City')).toBe('Salt Lake City');
+    expect(normalizers.properCase('SLC')).toBe('SLC');
   });
 });
 

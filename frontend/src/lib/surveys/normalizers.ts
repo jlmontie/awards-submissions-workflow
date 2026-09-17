@@ -49,6 +49,70 @@ function foldSuite(address: string): string {
     .replace(/#\s+(?=[A-Za-z0-9])/g, '#');
 }
 
+// Tokens that must survive case-folding intact. Without these, folding an
+// all-caps entry turns 'PRESIDENT/CEO' into 'President/Ceo'.
+const PRESERVED_ACRONYMS = new Set([
+  'CEO', 'COO', 'CFO', 'CTO', 'CIO', 'EVP', 'SVP', 'VP', 'GM', 'PIC',
+  'PE', 'SE', 'PLS', 'RA', 'AIA', 'PTOE', 'MEP', 'GIS', 'BD', 'IT', 'HR',
+  'US', 'USA', 'UT', 'SLC', 'LEED', 'AP',
+]);
+
+/**
+ * Title-case a value that arrived shouting, leaving acronyms alone:
+ * 'PRESIDENT' -> 'President', 'P.E., COO' -> 'P.E., COO', 'SANDY' -> 'Sandy'.
+ *
+ * A value containing any lowercase is returned untouched — it is already
+ * cased the way its author meant it, and re-casing would fight entries like
+ * 'McKay' or 'de Boer'.
+ */
+function foldAllCaps(value: string): string {
+  if (!/[A-Z]/.test(value) || /[a-z]/.test(value)) return value;
+  return value.replace(/[A-Za-z][A-Za-z.]*/g, (word) => {
+    if (PRESERVED_ACRONYMS.has(word.replace(/\./g, '').toUpperCase())) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
+// Professional credentials that print in neither the name nor the title
+// column. The engineering list runs on licensed professionals, so a licence
+// distinguishes nobody; editorial has stripped these by hand every year.
+// Matched whole, so a surname made of the same letters survives.
+const CREDENTIAL = /^(?:P\.?\s?E\.?|S\.?\s?E\.?|P\.?L\.?S\.?|PTOE|RSP\s?\d*|R\.?A\.?|AIA|LEED\s*AP|SECB|F?\.?ASCE)$/i;
+
+/**
+ * Drop credentials from a comma-delimited person or title string, wherever
+ * they sit: 'Brent Crowther, PE, PTOE, RSP1' -> 'Brent Crowther', and
+ * 'P.E., COO' -> 'COO', where the credential leads rather than trails. A
+ * space-separated trailing credential ('Clark Prothero PE') goes too.
+ *
+ * Only a part that is entirely a credential is dropped, so a stray job title
+ * typed into the name box survives to be seen and fixed.
+ */
+function dropCredentials(value: string): string {
+  const kept = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part && !CREDENTIAL.test(part));
+  let out = kept.join(', ');
+  let prev: string;
+  do {
+    prev = out;
+    out = out.replace(/\s+(?:P\.?\s?E\.?|S\.?\s?E\.?|P\.?L\.?S\.?|PTOE|RSP\s?\d*|AIA|LEED\s*AP)\s*$/i, '').trim();
+  } while (out !== prev);
+  return out;
+}
+
+// Long-form title words the page sets short, taken from what editorial
+// actually changed rather than from a general abbreviation scheme.
+// 'Senior' shortens only in 'Senior Vice President' -- 'Senior Principal'
+// runs in full on both the 2025 and 2026 pages, because it already fits.
+const TITLE_ABBREVIATIONS: [RegExp, string][] = [
+  [/\bSenior Vice President\b/gi, 'Sr. Vice President'],
+  [/\bPrincipal in Charge\b/gi, 'Principal-in-Charge'],
+  [/\bRegional\b/g, 'Reg.'],
+  [/\bBusiness\b/g, 'Bus.'],
+];
+
 // Named normalizers applied to survey field values at write-time.
 //
 // Add a new entry here, then tag fields in `templates.ts` with
@@ -61,25 +125,57 @@ function foldSuite(address: string): string {
 export const normalizers = {
   trim: (raw: unknown): string => String(raw ?? '').trim(),
 
-  // A person's name prints without their PE. Nearly every executive on the
-  // engineering list carries the licence, so it distinguishes no one and the
-  // magazine has never set it in the name — last year's page ran 'Jeffrey S.
-  // Watkins' in the name column and put the credential in the title column,
-  // where a firm chose to put it.
+  // A person's name prints without their credentials. The engineering list
+  // runs on licensed professionals, so a licence distinguishes nobody, and
+  // the page has never set one in the name column -- last year ran 'Jeffrey
+  // S. Watkins', with the credential in the title column where a firm put it
+  // there.
   //
-  // Strips a trailing 'PE' / 'P.E.' with any leading comma, and loops so a
-  // doubled 'Name, PE, PE' collapses too. Only PE: 'SE' and 'PLS' are not
-  // universal, so they say something and are left for editorial to judge.
-  // The word boundary keeps surnames ending in the letters ('Lope') intact.
+  // This started as PE only, on the reasoning that SE and PLS say something.
+  // Editorial's own pass over the 2026 export says otherwise: it cut 'PE,
+  // PTOE, RSP1' from Brent Crowther and 'SE' from Scott Wilson. The one SE
+  // left standing (Justin Naser, in the structural table but not the overall
+  // one) is the same inconsistency the 2025 page shipped with, so it reads as
+  // an oversight rather than intent.
+  //
+  // All-caps entries fold too: 'JARED FORD' -> 'Jared Ford'.
   personName: (raw: unknown): string => {
-    let name = String(raw ?? '').trim();
-    let prev: string;
-    do {
-      prev = name;
-      name = name.replace(/[,\s]*\bP\.?\s?E\.?\s*$/i, '').trim();
-    } while (name !== prev);
-    return name || String(raw ?? '').trim();
+    const original = String(raw ?? '').trim();
+    return dropCredentials(foldAllCaps(original)) || original;
   },
+
+  // An executive's title, set the way the page sets it:
+  //
+  //   'President & CEO'              -> 'President/CEO'
+  //   'President and CEO'            -> 'President/CEO'
+  //   'President - CEO'              -> 'President/CEO'
+  //   'Senior Vice President'        -> 'Sr. Vice President'
+  //   'Regional Chief Executive'     -> 'Reg. Chief Executive'
+  //   'Local Business Leader'        -> 'Local Bus. Leader'
+  //   'Principal in Charge'          -> 'Principal-in-Charge'
+  //   'PRESIDENT'                    -> 'President'
+  //   'P.E., COO'                    -> 'COO'
+  //
+  // Every rule here is one editorial applied by hand to the 2026 export.
+  // Only a spaced hyphen joins two titles, so 'Principal-in-Charge' and
+  // other hyphenated words survive.
+  title: (raw: unknown): string => {
+    const original = String(raw ?? '').trim().replace(/\s+/g, ' ');
+    if (!original) return '';
+    let out = dropCredentials(foldAllCaps(original));
+    out = out.replace(/\s*&\s*|\s+and\s+|\s+-\s+/gi, '/');
+    for (const [pattern, replacement] of TITLE_ABBREVIATIONS) {
+      out = out.replace(pattern, replacement);
+    }
+    // A title that was nothing but a credential keeps what the firm typed;
+    // blanking the column loses more than the credential costs.
+    return out.trim() || original;
+  },
+
+  // Fold a shouted free-text value to normal case, for fields the page sets
+  // in title case regardless of how they were typed ('SANDY' -> 'Sandy').
+  // Not for firm names: 'AECOM' and 'BHB' are meant to shout.
+  properCase: (raw: unknown): string => foldAllCaps(String(raw ?? '').trim()),
 
   // Revenue is entered in millions to two decimal places — the second decimal
   // breaks ranking ties at the hundreds-of-thousands place, so stored values
@@ -96,9 +192,14 @@ export const normalizers = {
   email: (raw: unknown): string => String(raw ?? '').trim().toLowerCase(),
 
   // Print style for a website is the bare domain: 'https://www.Okland.com/'
-  // sets as 'okland.com'. Drop the scheme, a leading 'www.', and any trailing
-  // slash, and lowercase the host. A path is kept as typed (only the host is
-  // case-insensitive) so a deep link still resolves if one ever shows up.
+  // sets as 'okland.com'. Drop the scheme, a leading 'www.', the path, and
+  // any trailing slash, and lowercase the host.
+  //
+  // The path used to be kept, on the theory that a deep link should still
+  // resolve. One then showed up -- Terracon submitted
+  // 'terracon.com/offices/salt-lake-city' -- and editorial cut it back to the
+  // domain, which is what the column has always carried. The reader is being
+  // pointed at the firm, not at a page.
   //
   // Unlike its siblings this one runs at *export* time only (via
   // `formatWebsite`), not at write-time: submitted responses are prefilled
@@ -112,10 +213,7 @@ export const normalizers = {
       .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
       .replace(/^www\./i, '');
     const slash = bare.indexOf('/');
-    if (slash === -1) return bare.toLowerCase();
-    const host = bare.slice(0, slash).toLowerCase();
-    const path = bare.slice(slash).replace(/\/+$/, '');
-    return `${host}${path}`;
+    return (slash === -1 ? bare : bare.slice(0, slash)).toLowerCase();
   },
 
   // Normalize a US state value to its 2-letter postal code. Accepts the

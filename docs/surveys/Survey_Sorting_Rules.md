@@ -19,14 +19,30 @@ See docs/surveys/0.0_2025ArchRankingsTXT copy 3.rtf
 2. Phone and website
     - Column title format: "Phone"\n"Website" 
     - Data format: `phone`\n`website`
-    - Websites print as the bare domain: the scheme, a leading `www.`, and any trailing slash are stripped and the host is lowercased (`https://www.Okland.com/` -> `okland.com`). Applied at export time only — the sheet keeps what the firm typed, because the value is prefilled back into a `type="url"` input when a response is edited.
+    - Websites print as the bare domain: the scheme, a leading `www.`, the path and any trailing slash are stripped and the host is lowercased (`https://www.Okland.com/` -> `okland.com`). Applied at export time only — the sheet keeps what the firm typed, because the value is prefilled back into a `type="url"` input when a response is edited.
+    - The path used to be kept, on the theory that a deep link should still resolve. One then arrived — Terracon submitted `terracon.com/offices/salt-lake-city` — and editorial cut it back to the domain. The column points the reader at the firm, not at a page.
 3. Year Established
     - Column title format: "Year Est."
     - Data format: `year_founded`
 4. Top executive, title, years at firm
     - Column title format: "Top Executive"\n"Title"\n"Years at Firm"
     - Data format: `top_executive`\n`top_executive_title`\n`years_at_firm`
-    - A trailing `PE` / `P.E.` is stripped from the name — on the engineering list nearly every executive holds the licence, so it distinguishes nobody and has never been set in the name column. Credentials that do say something (`SE`, `PLS`) are left alone for editorial to judge. A firm that wants the licence shown puts it in the title, where the list has always carried it.
+    - **Credentials are stripped from both the name and the title.** `Brent Crowther, PE, PTOE, RSP1` sets as `Brent Crowther`; `P.E., COO` sets as `COO`. These lists run on licensed professionals, so a licence distinguishes nobody, and editorial has cut them by hand every year. Recognised: PE, SE, PLS, PTOE, RSP*n*, RA, AIA, LEED AP, SECB, ASCE. Only a part that is *entirely* a credential is dropped, so a job title typed into the name box survives to be seen and fixed. A title that is nothing but a credential is kept rather than blanked.
+    - Titles take the page's house style:
+
+      | Input | Output |
+      |---|---|
+      | `President & CEO`, `President and CEO`, `President - CEO` | `President/CEO` |
+      | `Senior Vice President` | `Sr. Vice President` |
+      | `Regional Chief Executive` | `Reg. Chief Executive` |
+      | `Local Business Leader` | `Local Bus. Leader` |
+      | `Principal in Charge` | `Principal-in-Charge` |
+      | `PRESIDENT` | `President` |
+
+      Only a **spaced** hyphen joins two titles, so `Principal-in-Charge` and other hyphenated words survive. `Senior` shortens only in `Senior Vice President` — `Senior Principal` runs in full on both the 2025 and 2026 pages, because it already fits the column.
+    - Shouted entries fold to title case with acronyms intact (`PRESIDENT/CEO` -> `President/CEO`, never `President/Ceo`). The same fold applies to `city`, so `SANDY` sets as `Sandy`. It is **not** applied to `firm_name`: `AECOM` and `BHB` are meant to shout.
+
+    Three things editorial changed by hand are deliberately *not* rules, because each is a judgement or a data error rather than a transform: picking one of two real titles (`Senior Principal, President` -> `President`), the one-off `Director of Regional Operations` -> `Director, Reg. Operations`, and a misspelled job title typed into the name box (`JARED FORD, PE, PRINIPAL`).
 5. Largest projects
     - Column title format: "Largest Project to Finish in [previous year]"\n"Largest Project to Start in [current year]"
     - Data format: `largest_project_completed`\n`largest_project_upcoming`
