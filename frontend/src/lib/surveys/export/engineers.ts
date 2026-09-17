@@ -4,21 +4,30 @@
  * The printed engineering page is laid out like the GC page, not the
  * architect page: a 5-line per-firm block whose leftmost column stacks
  * firm / address / city / phone / website, and up to four top markets down
- * the right. It is also split by discipline — the survey's Discipline
- * section exists precisely to route a firm into those lists — so a single
- * submission can feed several ranked tables:
+ * the right.
  *
- *   - overall:     every Utah firm, ranked by Utah office revenue desc
- *   - civil:       discipline_civil, re-ranked within the discipline
- *   - mep:         discipline_mep
- *   - structural:  discipline_structural
- *   - outOfState:  HQ outside Utah (see `generateEngineerExport`)
+ * Output is ONE document, holding the four tables in the order they run in
+ * print. The editor forwards a single file to the designer, so the tables
+ * must not be split across a zip:
+ *
+ *   1. Top Overall      every firm, ranked by Utah office revenue desc
+ *   2. Top Civil        discipline_civil, re-ranked within the discipline
+ *   3. Top MEP          discipline_mep
+ *   4. Top Structural   discipline_structural
+ *
+ * A firm appears in the overall table and again in each discipline it
+ * selected — that is what the survey's Discipline section is for. Each table
+ * repeats the column heads and numbers its own firms from 1.
  *
  * Revenue-disclosing firms are numbered 1..n; DND firms follow in an
  * unnumbered block sorted by employee count, the way the page sets them.
  *
- * Both .txt and .rtf are emitted for each section so the route can bundle them
- * in a single .zip for the designer.
+ * Firms headquartered outside Utah rank inline with everyone else, on their
+ * Utah office revenues — as they do in print, where AECOM, WSP, Kimley-Horn,
+ * Michael Baker and Terracon all sit in the main list.
+ *
+ * Both .txt and .rtf are emitted so the route can serve the .rtf for the
+ * designer's Place File workflow and the preview pane can show the text.
  */
 
 import {
@@ -198,151 +207,134 @@ function splitAndSort(firms: Firm[]): { revenueFirms: Firm[]; dndFirms: Firm[] }
   return { revenueFirms, dndFirms };
 }
 
-/**
- * Emit one section as parallel .txt and .rtf strings. Walks the firm buckets
- * once and pushes to both buffers line-by-line so the two formats can never
- * drift out of sync.
- */
-function buildSection(args: {
-  title: string;
-  subtitle?: string;
-  intro?: string;
-  surveyYear: number;
-  firms: Firm[];
-}): { text: string; rtf: string } {
-  const { title, subtitle, intro, surveyYear, firms } = args;
-  const { revenueFirms, dndFirms } = splitAndSort(firms);
 
+/**
+ * Paired .txt / .rtf line buffers. Every push writes to both at once, so the
+ * two renderings of the same document can never drift out of sync.
+ */
+function createBuffers() {
   const txt: string[] = [];
   const rtf: string[] = [];
-
-  const pushText = (s: string) => { txt.push(s); rtf.push(rtfEscape(s)); };
-  const pushBlank = () => { txt.push(''); rtf.push(''); };
-  const pushHeader = () => {
-    for (const row of headerCells(surveyYear)) {
-      txt.push(row.join('\t'));
-      rtf.push(rtfRow(row, ENGINEER_COLUMN_POSITIONS));
-    }
+  return {
+    txt,
+    rtf,
+    /** A run of prose — title, heading, intro paragraph. */
+    line(s: string) { txt.push(s); rtf.push(rtfEscape(s)); },
+    blank() { txt.push(''); rtf.push(''); },
+    /** One tab-delimited grid row. */
+    row(cells: string[]) {
+      txt.push(cells.join('\t'));
+      rtf.push(rtfRow(cells, ENGINEER_COLUMN_POSITIONS));
+    },
   };
-  const pushFirm = (firm: Firm, rank: string) => {
-    for (const row of firmCells(firm, rank)) {
-      txt.push(row.join('\t'));
-      rtf.push(rtfRow(row, ENGINEER_COLUMN_POSITIONS));
-    }
-  };
+}
 
-  pushText(title);
-  pushBlank();
-  if (subtitle) {
-    pushText(subtitle);
-    pushBlank();
-  }
-  if (intro) {
-    pushText(intro);
-    pushBlank();
-  }
-  pushHeader();
-  pushBlank();
+type Buffers = ReturnType<typeof createBuffers>;
+
+const DND_HEADING = 'Firms that Did Not Disclose Revenues (listed by # of employees)';
+
+/**
+ * One ranked table: heading, column heads, numbered firms, then the
+ * unnumbered DND block. Each table repeats the column heads, because the
+ * printed page repeats them above every table.
+ */
+function pushTable(
+  buf: Buffers,
+  args: { heading: string; surveyYear: number; firms: Firm[] },
+): void {
+  const { heading, surveyYear, firms } = args;
+  const { revenueFirms, dndFirms } = splitAndSort(firms);
+
+  buf.line(heading);
+  buf.blank();
+  for (const row of headerCells(surveyYear)) buf.row(row);
+  buf.blank();
 
   revenueFirms.forEach((firm, i) => {
-    pushFirm(firm, `${i + 1}.`);
-    pushBlank();
+    for (const row of firmCells(firm, `${i + 1}.`)) buf.row(row);
+    buf.blank();
   });
 
   if (dndFirms.length) {
-    pushBlank();
-    pushText('Firms that Did Not Disclose Revenues (listed by # of employees)');
-    pushBlank();
-    pushBlank();
+    buf.blank();
+    buf.line(DND_HEADING);
+    buf.blank();
+    buf.blank();
     for (const firm of dndFirms) {
-      pushFirm(firm, '');
-      pushBlank();
+      for (const row of firmCells(firm, '')) buf.row(row);
+      buf.blank();
     }
   }
+}
 
-  return { text: txt.join('\n'), rtf: wrapRtf(rtf) };
+// Discipline tables, in the order they run in print, after the overall table.
+const DISCIPLINE_TABLES: { flag: string; heading: string }[] = [
+  { flag: 'discipline_civil', heading: 'Top Civil Engineering Firms' },
+  { flag: 'discipline_mep', heading: 'Top MEP (Mechanical + Electrical) Engineering Firms' },
+  { flag: 'discipline_structural', heading: 'Top Structural Engineering Firms' },
+];
+
+/** The whole list as one document: title, intro, then the four tables. */
+function buildDocument(
+  firms: Firm[],
+  surveyYear: number,
+): { text: string; rtf: string } {
+  const buf = createBuffers();
+  const prevYear = surveyYear - 1;
+  const nth = ordinal(surveyYear - 2012);
+
+  buf.line(`${surveyYear} Top Utah Engineering Firm Rankings`);
+  buf.blank();
+  buf.line(
+    `Utah Construction + Design is pleased to publish its ${nth} annual ` +
+    `list of the Top Engineering Firms in Utah, based on revenues generated ` +
+    `in ${prevYear} by a firm’s Utah offices. Projects outside of Utah that ` +
+    `are billed to Utah-based offices are included. Firms headquartered ` +
+    `outside Utah may participate; only revenues generated by their Utah ` +
+    `offices count toward the rankings. Firms who chose not to disclose ` +
+    `revenues (DND) are listed after revenue-disclosing firms by number of ` +
+    `employees. Every effort was made to contact respective firms and ` +
+    `encourage participation.`,
+  );
+  buf.blank();
+
+  pushTable(buf, {
+    heading:
+      'Top Overall Engineering Firms ' +
+      '(Ranked by Total Office Revenues; All Disciplines)',
+    surveyYear,
+    firms,
+  });
+
+  for (const { flag, heading } of DISCIPLINE_TABLES) {
+    const disciplineFirms = firms.filter((f) => isTrue(f[flag]));
+    // A discipline nobody selected is skipped rather than set as an empty
+    // table under a heading.
+    if (!disciplineFirms.length) continue;
+    buf.blank();
+    buf.blank();
+    pushTable(buf, { heading, surveyYear, firms: disciplineFirms });
+  }
+
+  return { text: buf.txt.join('\n'), rtf: wrapRtf(buf.rtf) };
 }
 
 export function generateEngineerExport(
   responses: Firm[],
   surveyYear: number,
 ): ExportResult {
-  const utah = responses.filter((f) => normalizeState(f.state) === 'UT');
-  // Kept from the documented rule, though it has never fired in practice:
-  // firms enter the address of the Utah office they are reporting for, so
-  // `state` reads 'UT' even for a national firm. The printed list ranks the
-  // nationals (AECOM, WSP, Kimley-Horn, Michael Baker, Terracon) inline.
-  const outOfState = responses.filter((f) => normalizeState(f.state) !== 'UT');
+  if (!responses.length) return { sections: [] };
 
-  const prevYear = surveyYear - 1;
-  const nth = ordinal(surveyYear - 2012);
-
-  const sections: ExportSection[] = [];
-
-  if (utah.length) {
-    const built = buildSection({
-      title: `${surveyYear} Top Utah Engineering Firm Rankings`,
-      subtitle:
-        'Top Overall Engineering Firms ' +
-        '(Ranked by Total Office Revenues; All Disciplines)',
-      intro:
-        `Utah Construction + Design is pleased to publish its ${nth} annual ` +
-        `list of the Top Engineering Firms in Utah, based on revenues ` +
-        `generated in ${prevYear} by a firm’s Utah offices. Projects ` +
-        `outside of Utah that are billed to Utah-based offices are included. ` +
-        `Firms who chose not to disclose revenues (DND) are listed after ` +
-        `revenue-disclosing firms by number of employees. Every effort was ` +
-        `made to contact respective firms and encourage participation.`,
-      surveyYear,
-      firms: utah,
-    });
-    sections.push({
-      key: 'utah',
-      label: 'Top Overall',
-      baseName: `${surveyYear}_EngRankings_Overall`,
-      text: built.text,
-      rtf: built.rtf,
-      count: utah.length,
-    });
-  }
-
-  const disciplines: [string, string, string, string][] = [
-    ['civil', 'discipline_civil', 'Top Civil Engineering Firms', 'Civil'],
-    ['mep', 'discipline_mep', 'Top MEP (Mechanical + Electrical) Engineering Firms', 'MEP'],
-    ['structural', 'discipline_structural', 'Top Structural Engineering Firms', 'Structural'],
-  ];
-
-  for (const [key, flag, title, label] of disciplines) {
-    const firms = utah.filter((f) => isTrue(f[flag]));
-    if (!firms.length) continue;
-    const built = buildSection({ title, surveyYear, firms });
-    sections.push({
-      key,
-      label,
-      baseName: `${surveyYear}_EngRankings_${label.replace(/[^A-Za-z]/g, '')}`,
-      text: built.text,
-      rtf: built.rtf,
-      count: firms.length,
-    });
-  }
-
-  if (outOfState.length) {
-    const built = buildSection({
-      title: `${surveyYear} Top Engineering Firm Rankings - Out of State`,
-      surveyYear,
-      firms: outOfState,
-    });
-    sections.push({
-      key: 'outOfState',
-      label: 'Out of State',
-      baseName: `${surveyYear}_EngRankings_OutOfState`,
-      text: built.text,
-      rtf: built.rtf,
-      count: outOfState.length,
-    });
-  }
-
-  return { sections };
+  const built = buildDocument(responses, surveyYear);
+  const section: ExportSection = {
+    key: 'rankings',
+    label: 'Engineering Rankings',
+    baseName: `${surveyYear}_EngRankings`,
+    text: built.text,
+    rtf: built.rtf,
+    count: responses.length,
+  };
+  return { sections: [section] };
 }
 
 export function rowsToEngineerFirms(rows: string[][]): Firm[] {
