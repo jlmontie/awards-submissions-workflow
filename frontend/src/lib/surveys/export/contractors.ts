@@ -20,8 +20,10 @@ import {
   type ExportResult,
   type ExportSection,
   type Firm,
+  formatAddress,
   formatCount,
   formatPct,
+  formatPersonName,
   formatPhone,
   formatRevenue,
   formatWebsite,
@@ -187,10 +189,10 @@ function firmCells(firm: Firm): string[][] {
   const employees = formatEmployees(firm);
 
   return [
-    [firm.firm_name || '', firm.year_founded || '', firm.top_executive || '',
+    [firm.firm_name || '', firm.year_founded || '', formatPersonName(firm.top_executive),
      completedProject, ut2024, ut2023, ut2022,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
-    [firm.address || '', employees, firm.top_executive_title || '',
+    [formatAddress(firm.address), employees, firm.top_executive_title || '',
      upcomingProject, all2024, all2023, all2022,
      topMarkets[1][0], formatPct(topMarkets[1][1])],
     [cityStateZip, '', firm.years_at_firm || '',

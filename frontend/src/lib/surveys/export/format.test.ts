@@ -75,6 +75,53 @@ describe('website normalizer', () => {
   });
 });
 
+describe('address normalizer: suite folding', () => {
+  it('folds every spelling of a suite to a bare #', () => {
+    expect(normalizers.address('756 E Winchester Street STE 400')).toBe('756 E Winchester Street #400');
+    expect(normalizers.address('111 E Broadway Suite 600')).toBe('111 E Broadway #600');
+    expect(normalizers.address('250 E 200 S Ste. 1000')).toBe('250 E 200 S #1000');
+    expect(normalizers.address('1628 W 11010 S Suite #102')).toBe('1628 W 11010 S #102');
+    expect(normalizers.address('7090 Union Park Ave # 500')).toBe('7090 Union Park Ave #500');
+  });
+
+  it('keeps a lettered suite uppercase rather than title-casing it', () => {
+    expect(normalizers.address('6952 High Tech Dr STE B')).toBe('6952 High Tech Dr #B');
+  });
+
+  it('leaves an address with no suite alone', () => {
+    expect(normalizers.address('2162 W Grove Parkway')).toBe('2162 W Grove Parkway');
+    expect(normalizers.address('154 E 14075 S')).toBe('154 E 14075 S');
+  });
+
+  it('does not eat street names that merely contain the designator', () => {
+    expect(normalizers.address('756 E Winchester St')).toBe('756 E Winchester St');
+    expect(normalizers.address('900 Stevens Dr')).toBe('900 Stevens Dr');
+  });
+});
+
+describe('personName normalizer', () => {
+  it('drops a trailing PE in any spelling', () => {
+    expect(normalizers.personName('Jeffrey S. Watkins, P.E.')).toBe('Jeffrey S. Watkins');
+    expect(normalizers.personName('Clark D. Prothero PE')).toBe('Clark D. Prothero');
+    expect(normalizers.personName('Mark Freeman, pe')).toBe('Mark Freeman');
+  });
+
+  it('leaves credentials that actually distinguish someone', () => {
+    expect(normalizers.personName('Justin Naser, SE')).toBe('Justin Naser, SE');
+    expect(normalizers.personName('Michael Nadeau, PLS')).toBe('Michael Nadeau, PLS');
+  });
+
+  it('does not chew into a surname ending in those letters', () => {
+    expect(normalizers.personName('Anne Poe')).toBe('Anne Poe');
+    expect(normalizers.personName('Marc Dupre')).toBe('Marc Dupre');
+  });
+
+  it('passes a plain name and a blank through', () => {
+    expect(normalizers.personName('Bryan Foote')).toBe('Bryan Foote');
+    expect(normalizers.personName('')).toBe('');
+  });
+});
+
 describe('joinProjectAndLocation', () => {
   it('drops a redundant Utah state token', () => {
     expect(joinProjectAndLocation('Point of the Mountain', 'Lehi, UT')).toBe('Point of the Mountain — Lehi');

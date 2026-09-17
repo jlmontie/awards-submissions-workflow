@@ -144,6 +144,25 @@ export function formatWebsite(raw: string | undefined): string {
 }
 
 /**
+ * Re-normalize an address at export time. New submissions already have their
+ * suite folded to '#400' by the `address` normalizer at write-time; rows that
+ * landed in the sheet earlier still carry 'STE 400' / 'Suite 400' and get
+ * fixed up here, so one printed list doesn't mix both styles.
+ */
+export function formatAddress(raw: string | undefined): string {
+  return normalizers.address(raw);
+}
+
+/**
+ * Re-normalize an executive's name at export time, dropping a trailing PE.
+ * Same reason as `formatAddress`: the write-time normalizer only covers rows
+ * submitted after it shipped.
+ */
+export function formatPersonName(raw: string | undefined): string {
+  return normalizers.personName(raw);
+}
+
+/**
  * Convert sheet rows into firm dicts keyed by header name. The first row
  * is treated as the header if it starts with `response_id`; otherwise the
  * caller-provided `fallbackHeaders` are used. If the sheet header row is
