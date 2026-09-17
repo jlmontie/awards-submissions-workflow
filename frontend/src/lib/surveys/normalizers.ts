@@ -30,6 +30,25 @@ const DIRECTIONALS: Record<string, string> = {
   NE: 'NE', NW: 'NW', SE: 'SE', SW: 'SW',
 };
 
+// Suite / unit designators fold to a bare '#'. The printed lists have never
+// carried the word: last year's page sets '756 E. Winchester St #400', not
+// 'STE 400'. Editorial retyped these by hand every year, so the rule lives
+// here instead. 'Suite 400', 'STE 400', 'Ste. #400' and '# 400' all land on
+// '#400'; an address with no suite is untouched.
+//
+// Only the suite words are folded. 'Unit', 'Apt' and 'Bldg' are left alone —
+// none has ever appeared in these lists, and guessing at one would mangle an
+// address rather than tidy it.
+//
+// The designator has to be a whole word on both sides, or the rule eats real
+// street names: without the trailing boundary 'Stevens Dr' folds to '#vens Dr',
+// and without the leading one 'Winchester St' loses its first six characters.
+function foldSuite(address: string): string {
+  return address
+    .replace(/\b(?:ste|suite)\b\.?\s*#?\s*(?=[A-Za-z0-9])/gi, '#')
+    .replace(/#\s+(?=[A-Za-z0-9])/g, '#');
+}
+
 // Named normalizers applied to survey field values at write-time.
 //
 // Add a new entry here, then tag fields in `templates.ts` with
@@ -41,6 +60,26 @@ const DIRECTIONALS: Record<string, string> = {
 // validation is a separate concern.
 export const normalizers = {
   trim: (raw: unknown): string => String(raw ?? '').trim(),
+
+  // A person's name prints without their PE. Nearly every executive on the
+  // engineering list carries the licence, so it distinguishes no one and the
+  // magazine has never set it in the name — last year's page ran 'Jeffrey S.
+  // Watkins' in the name column and put the credential in the title column,
+  // where a firm chose to put it.
+  //
+  // Strips a trailing 'PE' / 'P.E.' with any leading comma, and loops so a
+  // doubled 'Name, PE, PE' collapses too. Only PE: 'SE' and 'PLS' are not
+  // universal, so they say something and are left for editorial to judge.
+  // The word boundary keeps surnames ending in the letters ('Lope') intact.
+  personName: (raw: unknown): string => {
+    let name = String(raw ?? '').trim();
+    let prev: string;
+    do {
+      prev = name;
+      name = name.replace(/[,\s]*\bP\.?\s?E\.?\s*$/i, '').trim();
+    } while (name !== prev);
+    return name || String(raw ?? '').trim();
+  },
 
   // Revenue is entered in millions to two decimal places — the second decimal
   // breaks ranking ties at the hundreds-of-thousands place, so stored values
@@ -108,11 +147,14 @@ export const normalizers = {
   // Tie-break export ordering on hundreds-of-K precision needs consistent
   // address text so duplicates collapse cleanly downstream.
   address: (raw: unknown): string => {
-    const trimmed = String(raw ?? '').trim().replace(/\s+/g, ' ');
+    const trimmed = foldSuite(String(raw ?? '').trim().replace(/\s+/g, ' '));
     if (!trimmed) return '';
     return trimmed
       .split(' ')
       .map((tokenRaw) => {
+        // A folded suite token is already in print form. Title-casing it would
+        // turn '#B' into '#b', so only the designator itself is uppercased.
+        if (tokenRaw.startsWith('#')) return `#${tokenRaw.slice(1).toUpperCase()}`;
         const stripped = tokenRaw.replace(/\.$/, '');
         const upper = stripped.toUpperCase();
         if (DIRECTIONALS[upper]) return DIRECTIONALS[upper];

@@ -15,8 +15,10 @@ import {
   type ExportResult,
   type ExportSection,
   type Firm,
+  formatAddress,
   formatCount,
   formatPct,
+  formatPersonName,
   formatPhone,
   formatRevenue,
   formatWebsite,
@@ -124,10 +126,10 @@ function firmCells(firm: Firm): string[][] {
 
   return [
     [firm.firm_name || '', formatPhone(firm.phone), firm.year_founded || '',
-     firm.top_executive || '', completedProject,
+     formatPersonName(firm.top_executive), completedProject,
      formatCount(firm.num_employees), revCurrent, revPrior1, revPrior2,
      topMarkets[0][0], formatPct(topMarkets[0][1])],
-    [firm.address || '', formatWebsite(firm.website), '',
+    [formatAddress(firm.address), formatWebsite(firm.website), '',
      firm.top_executive_title || '', upcomingProject,
      formatCount(firm.num_licensed_architects), '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
