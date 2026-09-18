@@ -388,6 +388,18 @@ function engineerResponseRow({ responseId, surveyId, recipientId, token, now, da
     data.discipline_civil,
     data.discipline_mep,
     data.discipline_structural,
+    // Second wave of appends: four new market checkboxes lifted from last
+    // year's most common `other_segment_name` write-ins, plus two more `Other`
+    // slots so a firm with several write-in markets can enter each on its own
+    // line instead of concatenating them into one string.
+    data.pct_aviation,
+    data.pct_transit,
+    data.pct_energy,
+    data.pct_environmental,
+    data.pct_other_2,
+    data.other_segment_name_2,
+    data.pct_other_3,
+    data.other_segment_name_3,
   ].map(stringify);
 }
 

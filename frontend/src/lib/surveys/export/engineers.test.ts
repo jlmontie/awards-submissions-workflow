@@ -204,6 +204,51 @@ describe('engineer firm block', () => {
     expect(block.map((row) => row[9])).toEqual(['67%', '15%', '6%', '4%', '']);
   });
 
+  it('prints the new market checkboxes alongside the older ones', () => {
+    // The four checkboxes added from last year's most common `Other`
+    // write-ins. If any regresses to the literal word `Other`, the loop
+    // has stopped reading it as a first-class segment.
+    const block = firstBlock(table(doc([firm({
+      firm_name: 'National Co',
+      pct_highway: '', pct_telecomm: '', pct_water: '', pct_industrial: '',
+      pct_aviation: '40', pct_transit: '30', pct_energy: '15', pct_environmental: '5',
+    })]), OVERALL));
+    expect(block.map((row) => row[8])).toEqual([
+      'Aviation', 'Transit', 'Energy', 'Environmental', '',
+    ]);
+  });
+
+  it('prints each of the three Other slots as its own market', () => {
+    // A firm whose write-ins used to be crammed into one `Other` string now
+    // has three named slots. Each slot's firm-supplied label should reach
+    // the page — not the literal word `Other` — and each pct should sort
+    // in with the checkbox segments.
+    const block = firstBlock(table(doc([firm({
+      firm_name: 'Split Co',
+      pct_highway: '30', pct_water: '', pct_telecomm: '', pct_industrial: '',
+      pct_other: '25', other_segment_name: 'Energy',
+      pct_other_2: '23', other_segment_name_2: 'Mining',
+      pct_other_3: '18', other_segment_name_3: 'Transit',
+    })]), OVERALL));
+    expect(block.map((row) => row[8])).toEqual([
+      'Highway', 'Energy', 'Mining', 'Transit', '',
+    ]);
+    expect(block.map((row) => row[9])).toEqual(['30%', '25%', '23%', '18%', '']);
+  });
+
+  it('falls back to the literal `Other` when an Other slot has no label', () => {
+    // A firm that ticked `Other` at 100% but skipped the name box — the
+    // Resolut case in the 2026 responses. The word `Other` is a valid
+    // last-resort so the pct still surfaces.
+    const block = firstBlock(table(doc([firm({
+      firm_name: 'Unlabelled Co',
+      pct_highway: '', pct_water: '', pct_telecomm: '', pct_industrial: '',
+      pct_other: '100', other_segment_name: '',
+    })]), OVERALL));
+    expect(block[0][8]).toBe('Other');
+    expect(block[0][9]).toBe('100%');
+  });
+
   it('folds the suite and drops a PE on the way to print', () => {
     const text = doc([firm({ top_executive: 'Jeffrey S. Watkins, P.E.' })]);
     expect(text).toContain('2162 W Grove Parkway #100');

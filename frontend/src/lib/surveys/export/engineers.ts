@@ -59,11 +59,11 @@ import {
  * Column order in the `Survey Responses - Engineers` sheet. Matches the
  * positional output of `engineerResponseRow` in the responses route.
  */
-// `pct_data_centers` and the `discipline_*` columns are appended after
-// `other_segment_name` rather than slotted in with related fields: the row
-// writer is positional, so a mid-list insert would shift every later column of
-// the sheets already holding responses. Form order is independent of column
-// order.
+// `pct_data_centers`, the `discipline_*` columns, and the second wave of
+// market/`Other` fields are appended after `other_segment_name` rather than
+// slotted in with related fields: the row writer is positional, so a mid-list
+// insert would shift every later column of the sheets already holding
+// responses. Form order is independent of column order.
 export const ENGINEER_RESPONSE_COLUMNS = [
   'response_id', 'survey_id', 'recipient_id', 'token', 'submitted_at',
   'firm_name', 'location', 'year_founded', 'top_executive',
@@ -80,8 +80,14 @@ export const ENGINEER_RESPONSE_COLUMNS = [
   'pct_wastewater', 'pct_other', 'other_segment_name',
   'pct_data_centers',
   'discipline_civil', 'discipline_mep', 'discipline_structural',
+  'pct_aviation', 'pct_transit', 'pct_energy', 'pct_environmental',
+  'pct_other_2', 'other_segment_name_2',
+  'pct_other_3', 'other_segment_name_3',
 ];
 
+// Segments the form asks about as their own checkboxes. `Other` slots are
+// handled separately in `getTopMarkets` because each carries a firm-supplied
+// label; adding them here would print the literal word `Other` instead.
 const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_k12: 'K-12',
   pct_higher_ed: 'Higher Ed',
@@ -94,13 +100,24 @@ const MARKET_DISPLAY_NAMES: Record<string, string> = {
   pct_sports_rec: 'Sports/Rec',
   pct_industrial: 'Industrial',
   pct_highway: 'Highway',
+  pct_transit: 'Transit',
+  pct_aviation: 'Aviation',
   pct_underground: 'Underground',
   pct_telecomm: 'Telecomm',
   pct_water: 'Water',
   pct_wastewater: 'Wastewater',
+  pct_energy: 'Energy',
+  pct_environmental: 'Environmental',
   pct_data_centers: 'Data Centers',
-  pct_other: 'Other',
 };
+
+// Three `Other` slots, each carrying a firm-supplied label. Ordered as they
+// appear on the form so the first slot a firm fills is the first considered.
+const OTHER_SLOTS: { pctKey: string; nameKey: string }[] = [
+  { pctKey: 'pct_other', nameKey: 'other_segment_name' },
+  { pctKey: 'pct_other_2', nameKey: 'other_segment_name_2' },
+  { pctKey: 'pct_other_3', nameKey: 'other_segment_name_3' },
+];
 
 // Top markets shown per firm. Four, because the printed block is five lines
 // tall and the markets run down lines 1-4 — the same as the GC page. (This
@@ -117,11 +134,14 @@ const ENGINEER_COLUMN_POSITIONS = [0, 5, 40, 55, 85, 170, 180, 190, 200, 220];
 
 function getTopMarkets(firm: Firm, n = TOP_MARKETS_N): [string, number][] {
   const markets: [string, number][] = [];
-  const customOther = (firm.other_segment_name || '').trim();
   for (const [key, displayName] of Object.entries(MARKET_DISPLAY_NAMES)) {
     const pct = parseFloat2(firm[key]);
+    if (pct > 0) markets.push([displayName, pct]);
+  }
+  for (const { pctKey, nameKey } of OTHER_SLOTS) {
+    const pct = parseFloat2(firm[pctKey]);
     if (pct > 0) {
-      const name = key === 'pct_other' && customOther ? customOther : displayName;
+      const name = (firm[nameKey] || '').trim() || 'Other';
       markets.push([name, pct]);
     }
   }

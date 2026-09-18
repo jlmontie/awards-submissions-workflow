@@ -112,8 +112,12 @@ The leftmost column stacks five lines; the rest hang off the first two.
 - Column heads are worded as they ran in print: "Largest Project Completed in [prev year]" over "Largest Project to break ground in [current year]". Neither says "Utah"; the intro and the "(Utah offices)" note under the revenue columns already scope the list.
 - Market segments add five infrastructure categories on top of the architect set: Highway, Underground, TeleComm, Water, and Wastewater.
 
-## Known Gap: One "Other" Slot
-The printed page routinely gives a firm two or three market names the form does not offer — Energy, Mining, Transit, Rail/Transit, Transportation, Federal, Aviation, Environmental, Municipal, Survey/GIS, Gas & Electric all appeared in the 2025 list. The form has a single "Other (please specify)" box, so the export can print at most one custom name per firm and the rest have to be keyed by editorial. Closing this means adding segments to the engineering template, which is a form change, not an export change.
+## Market Segments: Checkboxes + Three "Other" Slots
+The engineering template carries the building-type checkboxes shared with the architect list, plus a set of infrastructure ones the print page routinely uses: Highway, Transit, Aviation, Underground, TeleComm, Water, Wastewater, Energy, Environmental, Data Centers. The four newest — Transit, Aviation, Energy, Environmental — are the write-ins that appeared on two or more firms in the September 2025 list; promoting them retires the bulk of the `Other` traffic.
+
+The form also gives three `Other (please specify)` slots, each a name + percentage pair. That covers the long tail the page still shows in ones and twos — Federal (Michael Baker), Ecclesiastical (Resolut), Survey/GIS (Sunrise), Municipal (Kimley-Horn), Haz. Waste (AECOM), Rail/Transit (Horrocks) — without concatenating them into one string the export has to split later. The slot columns append after the discipline columns to keep every earlier column at its existing position in the responses sheet.
+
+The `pct_other_*` fields carry the pct; the paired `other_segment_name_*` field carries the label. An `Other` slot with a pct but a blank label prints as the literal word `Other` — a last-resort fallback for a firm that ticks 100% Other and skips the name box.
 
 # Contractor Survey Rules
 The GC list uses its own page layout — a 5-line per-firm block, 9 columns — but the formatting rules above (thousands separators, bare-domain websites, Utah-stripped project locations) apply unchanged.
