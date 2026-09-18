@@ -144,7 +144,7 @@ function headerCells(surveyYear: number): string[][] {
     ['', '', '', '', '', 'Annual Revenues (millions)', '', '', '', ''],
     ['', 'Firm Name', 'Year Est.', 'Top Executive', `Largest Project Completed in ${prev}`, `${prev}`, `${prev1}`, `${prev2}`, 'Top Markets', '%'],
     ['', 'Address (HQ)', '# of Employees', 'Title', `Largest Project to break ground in ${surveyYear}`, '(Utah offices)', '', '', '', ''],
-    ['', 'Phone / Website', 'Years at Firm', '', '', '', '', '', '', ''],
+    ['', 'Phone / Website', '', 'Years at Firm', '', '', '', '', '', ''],
   ];
 }
 
@@ -184,7 +184,7 @@ function firmCells(firm: Firm, rank: string): string[][] {
      formatTitle(firm.top_executive_title), upcomingProject,
      '', '', '',
      topMarkets[1][0], formatPct(topMarkets[1][1])],
-    ['', cityStateZip, firm.years_at_firm || '', '', '',
+    ['', cityStateZip, '', firm.years_at_firm || '', '',
      '', '', '',
      topMarkets[2][0], formatPct(topMarkets[2][1])],
     ['', formatPhone(firm.phone), '', '', '',

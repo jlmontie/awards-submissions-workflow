@@ -101,7 +101,7 @@ The leftmost column stacks five lines; the rest hang off the first two.
 ```
 1.  Firm Name          Year Est.       Top Executive  Largest Project Completed in [prev]   2025  2024  2023  Market 1  %
     Address (HQ)       # of Employees  Title          Largest Project to break ground in [year]  (Utah offices)  Market 2  %
-    City, ST ZIP       Years at Firm                                                                            Market 3  %
+    City, ST ZIP                       Years at Firm                                                            Market 3  %
     Phone                                                                                                       Market 4  %
     Website
 ```

@@ -177,9 +177,14 @@ describe('engineer firm block', () => {
     ]);
   });
 
-  it('stacks year est. / employees / years at firm in the second column', () => {
+  it('stacks year est. / employees in the second column', () => {
     const block = firstBlock(table(doc([firm()]), OVERALL));
-    expect(block.map((row) => row[2])).toEqual(['1968', '627', '35', '', '']);
+    expect(block.map((row) => row[2])).toEqual(['1968', '627', '', '', '']);
+  });
+
+  it('stacks top executive / title / years at firm in the third column', () => {
+    const block = firstBlock(table(doc([firm()]), OVERALL));
+    expect(block.map((row) => row[3])).toEqual(['Bryan Foote', 'President', '35', '', '']);
   });
 
   it('numbers the ranked firms', () => {
