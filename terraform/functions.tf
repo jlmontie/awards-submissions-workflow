@@ -33,7 +33,7 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   build_config {
     runtime     = "python311"
     entry_point = "process_pdf"
-    
+
     source {
       storage_source {
         bucket = google_storage_bucket.functions_source.name
@@ -43,22 +43,22 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   }
 
   service_config {
-    max_instance_count               = 10
-    min_instance_count               = 0
-    available_memory                 = "512M"
-    timeout_seconds                  = 540
-    service_account_email            = google_service_account.backend.email
-    ingress_settings                 = "ALLOW_INTERNAL_ONLY"
-    all_traffic_on_latest_revision   = true
+    max_instance_count             = 10
+    min_instance_count             = 0
+    available_memory               = "512M"
+    timeout_seconds                = 540
+    service_account_email          = google_service_account.backend.email
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision = true
 
     environment_variables = {
-      GCP_PROJECT_ID           = var.project_id
-      DRIVE_FOLDER_SECRET      = google_secret_manager_secret.drive_folder.secret_id
-      AWARDS_SHEET_ID_SECRET   = google_secret_manager_secret.awards_sheet_id.secret_id
-      USER_OAUTH_TOKEN_SECRET  = google_secret_manager_secret.user_oauth_token.secret_id
-      SUBMISSIONS_BUCKET       = google_storage_bucket.submissions.name
-      MAX_PDF_SIZE_MB          = var.max_pdf_size_mb
-      DRIVE_OWNER_EMAIL        = var.drive_owner_email
+      GCP_PROJECT_ID          = var.project_id
+      DRIVE_FOLDER_SECRET     = google_secret_manager_secret.drive_folder.secret_id
+      AWARDS_SHEET_ID_SECRET  = google_secret_manager_secret.awards_sheet_id.secret_id
+      USER_OAUTH_TOKEN_SECRET = google_secret_manager_secret.user_oauth_token.secret_id
+      SUBMISSIONS_BUCKET      = google_storage_bucket.submissions.name
+      MAX_PDF_SIZE_MB         = var.max_pdf_size_mb
+      DRIVE_OWNER_EMAIL       = var.drive_owner_email
 
       # SMTP for the submitter confirmation email. Same Resend gateway the
       # frontend uses for survey mail; password read from Secret Manager by
@@ -72,9 +72,17 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   }
 
   event_trigger {
-    trigger_region        = var.region
-    event_type            = "google.cloud.storage.object.v1.finalized"
-    retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"  # No automatic retries - fail fast to save costs
+    trigger_region = var.region
+    event_type     = "google.cloud.storage.object.v1.finalized"
+    # Retries are what make a transient failure survivable. The 2026-09/10
+    # outage lost nine days of submissions because the Drive token was
+    # rejected, every invocation raised once, and nothing tried again --
+    # re-minting the token recovered nothing on its own. The photo
+    # processor also *expects* retries: it raises "Project folder not
+    # found - will retry" when photos arrive before the PDF creates the
+    # folder, which with no retry policy silently drops the photo.
+    # A permanently bad payload backs off and is dropped after 24h.
+    retry_policy          = "RETRY_POLICY_RETRY"
     service_account_email = google_service_account.backend.email
 
     event_filters {
@@ -109,7 +117,7 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   build_config {
     runtime     = "python311"
     entry_point = "process_photo"
-    
+
     source {
       storage_source {
         bucket = google_storage_bucket.functions_source.name
@@ -119,13 +127,13 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   }
 
   service_config {
-    max_instance_count               = 20
-    min_instance_count               = 0
-    available_memory                 = "256M"
-    timeout_seconds                  = 120
-    service_account_email            = google_service_account.backend.email
-    ingress_settings                 = "ALLOW_INTERNAL_ONLY"
-    all_traffic_on_latest_revision   = true
+    max_instance_count             = 20
+    min_instance_count             = 0
+    available_memory               = "256M"
+    timeout_seconds                = 120
+    service_account_email          = google_service_account.backend.email
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision = true
 
     environment_variables = {
       GCP_PROJECT_ID          = var.project_id
@@ -138,11 +146,19 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   }
 
   event_trigger {
-    trigger_region        = var.region
-    event_type            = "google.cloud.storage.object.v1.finalized"
-    retry_policy          = "RETRY_POLICY_DO_NOT_RETRY"  # No automatic retries - fail fast to save costs
+    trigger_region = var.region
+    event_type     = "google.cloud.storage.object.v1.finalized"
+    # Retries are what make a transient failure survivable. The 2026-09/10
+    # outage lost nine days of submissions because the Drive token was
+    # rejected, every invocation raised once, and nothing tried again --
+    # re-minting the token recovered nothing on its own. The photo
+    # processor also *expects* retries: it raises "Project folder not
+    # found - will retry" when photos arrive before the PDF creates the
+    # folder, which with no retry policy silently drops the photo.
+    # A permanently bad payload backs off and is dropped after 24h.
+    retry_policy          = "RETRY_POLICY_RETRY"
     service_account_email = google_service_account.backend.email
-    
+
     event_filters {
       attribute = "bucket"
       value     = google_storage_bucket.submissions.name
@@ -211,8 +227,8 @@ resource "google_cloudfunctions2_function" "survey_export" {
     all_traffic_on_latest_revision = true
 
     environment_variables = {
-      GCP_PROJECT_ID        = var.project_id
-      SURVEY_SHEET_ID       = var.survey_sheet_id
+      GCP_PROJECT_ID  = var.project_id
+      SURVEY_SHEET_ID = var.survey_sheet_id
     }
   }
 

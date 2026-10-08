@@ -1,11 +1,23 @@
-# Log-based metric for PDF processing failures
+# Log-based metric for submission processing failures.
+#
+# This counted zero for its entire life. Both processors are
+# `google_cloudfunctions2_function`, and gen2 functions run on Cloud Run:
+# they log as resource.type="cloud_run_revision" with a `service_name`
+# label. The filter here was the gen1 shape — resource.type="cloud_function"
+# with `function_name` — which these functions never emit, so the metric
+# matched nothing and the alert below could not fire. Verified against the
+# live project: "cloud_function" returns 0 entries over the outage window,
+# "cloud_run_revision" returns the whole stack of invalid_grant errors.
+#
+# It also only watched the PDF processor. The photo processor fails
+# independently and is now included.
 resource "google_logging_metric" "pdf_processing_errors" {
   name = "${local.awards_prefix}-pdf-errors"
 
   depends_on = [google_project_service.required_apis]
-  filter = <<-EOT
-    resource.type="cloud_function"
-    resource.labels.function_name="${google_cloudfunctions2_function.pdf_processor.name}"
+  filter     = <<-EOT
+    resource.type="cloud_run_revision"
+    (resource.labels.service_name="${google_cloudfunctions2_function.pdf_processor.name}" OR resource.labels.service_name="${google_cloudfunctions2_function.photo_processor.name}")
     severity>=ERROR
   EOT
 
@@ -13,47 +25,64 @@ resource "google_logging_metric" "pdf_processing_errors" {
     metric_kind = "DELTA"
     value_type  = "INT64"
     unit        = "1"
-    labels {
-      key         = "error_type"
-      value_type  = "STRING"
-      description = "Type of error"
-    }
   }
 
-  label_extractors = {
-    "error_type" = "EXTRACT(jsonPayload.error_type)"
-  }
+  # No label_extractors: these functions log plain text via `logger.error`,
+  # so the previous EXTRACT(jsonPayload.error_type) never resolved.
 }
 
 # Alert policy for PDF processing errors
 resource "google_monitoring_alert_policy" "pdf_processing_errors" {
-  display_name = "${local.awards_prefix} PDF Processing Errors"
+  display_name = "${local.awards_prefix} Submission Processing Errors"
   combiner     = "OR"
-  
+
   conditions {
-    display_name = "PDF processing error rate > 5 per minute"
-    
+    # Any error at all, not a rate. This list takes a handful of submissions
+    # a day, so a total outage produces one or two errors a day: the previous
+    # threshold (ALIGN_RATE > 5, i.e. five errors per second) was calibrated
+    # for a service orders of magnitude busier and could never have tripped.
+    # One failed submission is one too many — every one is a firm that thinks
+    # it has entered and has not.
+    display_name = "A submission failed to process"
+
     condition_threshold {
-      filter          = "resource.type = \"cloud_function\" AND metric.type = \"logging.googleapis.com/user/${google_logging_metric.pdf_processing_errors.name}\""
-      duration        = "60s"
+      filter          = "resource.type = \"cloud_run_revision\" AND metric.type = \"logging.googleapis.com/user/${google_logging_metric.pdf_processing_errors.name}\""
+      duration        = "0s"
       comparison      = "COMPARISON_GT"
-      threshold_value = 5
-      
+      threshold_value = 0
+
       aggregations {
-        alignment_period   = "60s"
-        per_series_aligner = "ALIGN_RATE"
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_SUM"
       }
     }
   }
 
   notification_channels = [google_monitoring_notification_channel.email.id]
-  
+
   alert_strategy {
-    auto_close = "1800s"
+    # Long enough that a failure still shows as open the next morning,
+    # rather than closing itself overnight unseen.
+    auto_close = "86400s"
   }
 
   documentation {
-    content   = "PDF processing is failing at an elevated rate. Check Cloud Function logs for details."
+    content   = <<-EOT
+      A submission failed to process. The files are safe in the submissions
+      bucket — only the Drive/Sheets/email step failed — so nothing is lost,
+      but the submitter has been told their entry succeeded and it is not in
+      the sheet.
+
+      Check the logs:
+
+          gcloud logging read 'resource.type="cloud_run_revision"
+            AND resource.labels.service_name=~"awards-(pdf|photo)-processor"
+            AND severity>=ERROR' --freshness=1d --limit=20
+
+      `invalid_grant` means the Drive OAuth refresh token has expired or been
+      revoked; re-mint it per docs/DEPLOYMENT.md step 5. Once fixed, replay
+      anything stranded with scripts/backfill-submissions.py.
+    EOT
     mime_type = "text/markdown"
   }
 }
@@ -71,10 +100,18 @@ resource "google_monitoring_notification_channel" "email" {
 }
 
 # Dashboard for monitoring
+#
+# NOTE: the two function widgets below still filter on resource.type =
+# "cloud_function" and the cloudfunctions.googleapis.com/* metrics, which is
+# the gen1 shape these gen2 functions do not emit — the same bug fixed in the
+# log metric above, so those two charts read empty. Left as-is here because a
+# blank chart is cosmetic where a dead alert was not, and the correct gen2
+# metric names should be confirmed against the live project rather than
+# guessed. The storage widgets are unaffected.
 resource "google_monitoring_dashboard" "main" {
   dashboard_json = jsonencode({
     displayName = "${local.awards_prefix} Submission Dashboard"
-    
+
     gridLayout = {
       widgets = [
         {
