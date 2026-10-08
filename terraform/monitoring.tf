@@ -25,10 +25,33 @@ resource "google_logging_metric" "pdf_processing_errors" {
     metric_kind = "DELTA"
     value_type  = "INT64"
     unit        = "1"
+
+    # Kept deliberately, though nothing populates it.
+    #
+    # Any change to metric_descriptor.labels forces the metric to be
+    # replaced, and Cloud Logging refuses to delete a metric while an
+    # alerting policy references it:
+    #
+    #   Error 400: Cannot delete metric ucd-production-awards-pdf-errors.
+    #   That metric is still used in an alerting policy.
+    #
+    # Dropping this block is cosmetic; the deadlock it causes is not.
+    # Leaving it makes the filter fix a plain in-place update.
+    labels {
+      key         = "error_type"
+      value_type  = "STRING"
+      description = "Type of error"
+    }
   }
 
-  # No label_extractors: these functions log plain text via `logger.error`,
-  # so the previous EXTRACT(jsonPayload.error_type) never resolved.
+  # Inert, and kept for the same reason as the label above: these functions
+  # log plain text via `logger.error`, so jsonPayload.error_type never
+  # resolves and the label is always empty. Worth revisiting as a
+  # REGEXP_EXTRACT over textPayload once the incident is closed — but not as
+  # part of a change that has to apply cleanly right now.
+  label_extractors = {
+    "error_type" = "EXTRACT(jsonPayload.error_type)"
+  }
 }
 
 # Alert policy for PDF processing errors
