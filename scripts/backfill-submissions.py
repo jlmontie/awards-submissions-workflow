@@ -69,11 +69,15 @@ ENV_DEFAULTS = {
     'SMTP_FROM': 'Ladd Marshall <lmarshall@utahcdmag.com>',
 }
 
-# Only submissions uploaded on or after this instant are candidates. The token
-# broke somewhere between the last good upload (2026-09-04) and the first
-# observed failure; anything earlier was processed under the old token and
-# must not be touched.
-WINDOW_START = datetime(2026, 9, 29, 0, 0, 0, tzinfo=timezone.utc)
+# The sheet is the only thing that decides what has already been handled: a
+# submission_id present there is done, anything else in the bucket is not.
+#
+# An earlier version of this script also filtered to uploads on or after
+# 2026-09-29, on the assumption that everything older had been processed
+# under the working token. That assumption broke when the test data was
+# cleared out: a real submission from 2026-09-02 (Sandy Fire) was left in the
+# bucket with no sheet row and no Drive folder, and the date window silently
+# skipped it. Use --since only to deliberately narrow a run.
 
 
 def load_module(name: str, path: Path):
@@ -110,10 +114,11 @@ def submission_ids_in_sheet(pdf_processor) -> set:
     return {row[0].strip() for row in result.get('values', []) if row and row[0].strip()}
 
 
-def find_stranded(storage_client, bucket_name: str, known_ids: set):
-    """Submissions with a PDF in GCS uploaded after WINDOW_START and absent
-    from the sheet. Returns them oldest first, so the Awards IDs this script
-    generates follow the order the submissions actually arrived."""
+def find_stranded(storage_client, bucket_name: str, known_ids: set, since=None):
+    """Submissions with a PDF in GCS that the sheet has no row for.
+
+    Returns them oldest first, so the Awards IDs this script generates follow
+    the order the submissions actually arrived."""
     bucket = storage_client.bucket(bucket_name)
     submissions = {}
 
@@ -136,7 +141,7 @@ def find_stranded(storage_client, bucket_name: str, known_ids: set):
         s for s in submissions.values()
         if s['pdf'] is not None
         and s['uploaded'] is not None
-        and s['uploaded'] >= WINDOW_START
+        and (since is None or s['uploaded'] >= since)
         and s['id'] not in known_ids
     ]
     stranded.sort(key=lambda s: s['uploaded'])
@@ -171,6 +176,9 @@ def main() -> int:
                         help='actually write to Drive and Sheets (default: dry run)')
     parser.add_argument('--send-emails', action='store_true',
                         help='also send confirmation emails to submitters')
+    parser.add_argument('--since', metavar='YYYY-MM-DD', default=None,
+                        help='only replay uploads on or after this date '
+                             '(default: everything the sheet has no row for)')
     args = parser.parse_args()
 
     for key, value in ENV_DEFAULTS.items():
@@ -193,7 +201,12 @@ def main() -> int:
     known_ids = submission_ids_in_sheet(pdf_processor)
     print(f"  {len(known_ids)} submission(s) already in the sheet\n")
 
-    stranded = find_stranded(pdf_processor.storage_client, bucket_name, known_ids)
+    since = None
+    if args.since:
+        since = datetime.strptime(args.since, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        print(f"  limiting to uploads on or after {args.since}\n")
+
+    stranded = find_stranded(pdf_processor.storage_client, bucket_name, known_ids, since)
     if not stranded:
         print("Nothing to backfill.")
         return 0
