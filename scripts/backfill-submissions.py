@@ -69,15 +69,20 @@ ENV_DEFAULTS = {
     'SMTP_FROM': 'Ladd Marshall <lmarshall@utahcdmag.com>',
 }
 
-# The sheet is the only thing that decides what has already been handled: a
-# submission_id present there is done, anything else in the bucket is not.
+# The sheet decides what has already been handled: a submission_id present
+# there is done, anything else in the bucket is a candidate.
 #
-# An earlier version of this script also filtered to uploads on or after
-# 2026-09-29, on the assumption that everything older had been processed
-# under the working token. That assumption broke when the test data was
-# cleared out: a real submission from 2026-09-02 (Sandy Fire) was left in the
-# bucket with no sheet row and no Drive folder, and the date window silently
-# skipped it. Use --since only to deliberately narrow a run.
+# An earlier version also filtered to uploads on or after 2026-09-29, on the
+# assumption that everything older had been processed under the working
+# token. A date window is the wrong instrument — it drops things quietly, and
+# quiet dropping is the bug this whole exercise exists to fix. Anything that
+# must not be replayed is named here instead, where it is visible and the
+# script reports it.
+EXCLUDED_SUBMISSIONS = {
+    # Sandy Fire: a test submission from 2026-09-02 that outlived the cleanup
+    # of the rest of the test data. Real-looking, but not a real entry.
+    'eb95c5f3-8695-42cf-825d-5ba49f1d85a2': 'test submission (Sandy Fire)',
+}
 
 
 def load_module(name: str, path: Path):
@@ -137,24 +142,65 @@ def find_stranded(storage_client, bucket_name: str, known_ids: set, since=None):
         elif kind == 'photos':
             entry['photos'].append(blob)
 
-    stranded = [
+    candidates = [
         s for s in submissions.values()
         if s['pdf'] is not None
         and s['uploaded'] is not None
         and (since is None or s['uploaded'] >= since)
         and s['id'] not in known_ids
     ]
+
+    stranded, excluded = [], []
+    for s in candidates:
+        reason = EXCLUDED_SUBMISSIONS.get(s['id'])
+        (excluded if reason else stranded).append((s, reason) if reason else s)
+
     stranded.sort(key=lambda s: s['uploaded'])
-    return stranded
+    excluded.sort(key=lambda pair: pair[0]['uploaded'])
+    return stranded, excluded
 
 
-def upload_photos(photo_processor, drive_service, folder_id: str, photo_blobs) -> int:
-    """Upload a submission's photos into the folder its PDF created.
+def photos_subfolder(drive_service, project_folder_id: str) -> str:
+    """The 'Photos' subfolder, created if absent.
+
+    `process_photo` files photos one level down, not in the project folder
+    itself. Backfilled photos have to land in the same place or the restored
+    submissions won't match the shape of every submission that follows.
+    """
+    existing = drive_service.files().list(
+        q=("name='Photos' and mimeType='application/vnd.google-apps.folder' "
+           f"and '{project_folder_id}' in parents and trashed=false"),
+        spaces='drive',
+        fields='files(id)',
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True,
+    ).execute().get('files', [])
+    if existing:
+        return existing[0]['id']
+
+    created = drive_service.files().create(
+        body={
+            'name': 'Photos',
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [project_folder_id],
+        },
+        fields='id',
+        supportsAllDrives=True,
+    ).execute()
+    return created['id']
+
+
+def upload_photos(photo_processor, drive_service, project_folder_id: str, photo_blobs) -> int:
+    """Upload a submission's photos under the folder its own PDF created.
 
     Deliberately bypasses `photo_processor.get_project_folder`, which returns
-    an arbitrary project folder. Everything else -- resizing, mime handling --
-    is the function's own code.
+    an arbitrary project folder. Everything else -- resizing, mime handling,
+    the Photos subfolder -- matches what the function does.
     """
+    if not photo_blobs:
+        return 0
+    folder_id = photos_subfolder(drive_service, project_folder_id)
+
     uploaded = 0
     for blob in sorted(photo_blobs, key=lambda b: b.name):
         filename = blob.name.split('/')[-1]
@@ -206,7 +252,15 @@ def main() -> int:
         since = datetime.strptime(args.since, '%Y-%m-%d').replace(tzinfo=timezone.utc)
         print(f"  limiting to uploads on or after {args.since}\n")
 
-    stranded = find_stranded(pdf_processor.storage_client, bucket_name, known_ids, since)
+    stranded, excluded = find_stranded(
+        pdf_processor.storage_client, bucket_name, known_ids, since,
+    )
+
+    for s, reason in excluded:
+        print(f"  skipping {s['id']} -- {reason}")
+    if excluded:
+        print()
+
     if not stranded:
         print("Nothing to backfill.")
         return 0
