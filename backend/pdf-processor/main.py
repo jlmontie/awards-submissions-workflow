@@ -358,7 +358,8 @@ def format_team_for_sheet_row(awards_id: str, team_data: Dict[str, Dict[str, str
     ]
 
 
-def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
+def find_or_create_folder(service, parent_id: str, folder_name: str,
+                          submission_id: Optional[str] = None) -> str:
     """
     Find existing folder or create new one in Google Drive.
     With impersonation, folders will be owned by the impersonated user.
@@ -367,6 +368,12 @@ def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
         service: Authenticated Drive service
         parent_id: Parent folder ID
         folder_name: Name for the folder
+        submission_id: Stamped onto the folder as appProperties.submissionId
+            when creating a project folder. This is the only durable link
+            between a folder and the submission that produced it — the folder
+            is named after the project, which the photo processor never sees,
+            so without the stamp it cannot tell one project's folder from
+            another's. Omitted for the year folder, which is shared.
 
     Returns:
         ID of found or created folder
@@ -385,8 +392,21 @@ def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
     files = results.get('files', [])
 
     if files:
-        logger.info(f"Found existing folder: {folder_name} (ID: {files[0]['id']})")
-        return files[0]['id']
+        folder_id = files[0]['id']
+        logger.info(f"Found existing folder: {folder_name} (ID: {folder_id})")
+        # A folder created before the stamp existed, or by an earlier
+        # submission with the same project name, still needs the id so the
+        # photo processor can find it.
+        if submission_id:
+            try:
+                service.files().update(
+                    fileId=folder_id,
+                    body={'appProperties': {'submissionId': submission_id}},
+                    supportsAllDrives=True,
+                ).execute()
+            except Exception as e:
+                logger.warning(f"Could not stamp submissionId on {folder_id}: {e}")
+        return folder_id
 
     # Folder doesn't exist, create it
     file_metadata = {
@@ -394,6 +414,8 @@ def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
         'mimeType': 'application/vnd.google-apps.folder',
         'parents': [parent_id]
     }
+    if submission_id:
+        file_metadata['appProperties'] = {'submissionId': submission_id}
 
     try:
         folder = service.files().create(
@@ -632,6 +654,33 @@ def send_confirmation_email(email_data: Dict[str, str]) -> bool:
         return False
 
 
+def submission_already_recorded(service, sheet_id: str, submission_id: str) -> bool:
+    """
+    True if this submission already has a row in the master sheet.
+
+    Column B holds the GCS submission ID. Reading one column is cheap next to
+    the Drive work that follows, and it is what makes the trigger's retry
+    policy safe: without it, a retry of a run that failed after the row was
+    appended would upload the PDF twice, burn a second Awards ID and leave a
+    duplicate row for editorial to spot by eye.
+    """
+    try:
+        result = service.spreadsheets().values().get(
+            spreadsheetId=sheet_id,
+            range='Sheet1!B:B',
+        ).execute()
+    except Exception as e:
+        # Never block a submission on this check — a false negative costs a
+        # duplicate row, a hard failure here costs the submission entirely.
+        logger.warning(f"Could not check for an existing row, continuing: {e}")
+        return False
+
+    for row in result.get('values', []):
+        if row and row[0].strip() == submission_id:
+            return True
+    return False
+
+
 def append_to_sheet(service, sheet_id: str, values: list):
     """
     Append a row to Google Sheets.
@@ -726,16 +775,28 @@ def process_pdf(cloud_event):
             # Fallback to submission ID if no project name
             project_name = f"Submission-{submission_id[:8]}"
         
+        # This function is not idempotent past this point: it uploads the PDF,
+        # takes a fresh Awards ID and appends a row. The trigger retries on
+        # failure, and a retry of a run that got partway through would
+        # double-post, so stop here if the submission already has a row.
+        sheet_id = get_secret(AWARDS_SHEET_ID_SECRET)
+        sheets_service = get_sheets_service()
+        if submission_already_recorded(sheets_service, sheet_id, submission_id):
+            logger.info(f"Submission {submission_id} already in sheet, skipping")
+            return {'status': 'skipped', 'reason': 'already_recorded'}
+
         # Get Drive root folder ID
         drive_root_id = get_secret(DRIVE_FOLDER_SECRET)
-        
+
         # Initialize Drive service
         drive_service = get_drive_service()
         
         # Create folder structure: Root > Year > Project
         # With impersonation, folders will be owned by the impersonated user
         year_folder_id = find_or_create_folder(drive_service, drive_root_id, year)
-        project_folder_id = find_or_create_folder(drive_service, year_folder_id, project_name)
+        project_folder_id = find_or_create_folder(
+            drive_service, year_folder_id, project_name, submission_id
+        )
         
         # Upload PDF to Drive
         file_id, file_link = upload_to_drive(
@@ -745,10 +806,8 @@ def process_pdf(cloud_event):
             project_folder_id
         )
         
-        # Prepare row for Sheets
-        sheet_id = get_secret(AWARDS_SHEET_ID_SECRET)
-        sheets_service = get_sheets_service()
-        
+        # sheet_id / sheets_service were resolved above for the duplicate check.
+
         # Generate unique Awards ID for this submission
         awards_id = generate_awards_id(sheets_service, sheet_id, year)
         logger.info(f"Generated Awards ID: {awards_id} for submission {submission_id}")

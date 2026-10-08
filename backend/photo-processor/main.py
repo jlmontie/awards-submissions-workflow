@@ -192,25 +192,32 @@ def get_project_folder(service, root_id: str, year: str,
         logger.warning(f"Year folder not found: {year}")
         return None
     
-    # Find project folder - it should be created by PDF processor
-    # We'll search for folders in this year and look for metadata matching submission_id
-    query = f"mimeType='application/vnd.google-apps.folder' and '{year_folder_id}' in parents and trashed=false"
+    # Match the folder the PDF processor stamped for THIS submission. The
+    # folder is named after the project, which we never see here, so the
+    # stamp is the only thing tying a folder to a submission.
+    #
+    # This used to list the year's folders and return folders[0] — whichever
+    # sorted first. With one project in the year that happened to be right;
+    # with several it files photos under an unrelated project, which is worse
+    # than not filing them at all, because nothing looks wrong.
+    query = (
+        "mimeType='application/vnd.google-apps.folder' "
+        f"and '{year_folder_id}' in parents and trashed=false "
+        f"and appProperties has {{ key='submissionId' and value='{submission_id}' }}"
+    )
 
     results = service.files().list(
         q=query,
         spaces='drive',
-        fields='files(id, name, description)',
+        fields='files(id, name)',
         supportsAllDrives=True,
         includeItemsFromAllDrives=True
     ).execute()
 
     folders = results.get('files', [])
-    
-    # For now, return the first folder (assumes PDF created it)
-    # In production, you might add description/properties to match submission_id
     if folders:
         return folders[0]['id']
-    
+
     logger.warning(f"Project folder not found for submission: {submission_id}")
     return None
 
