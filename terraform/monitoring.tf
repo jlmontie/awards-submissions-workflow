@@ -69,7 +69,21 @@ resource "google_monitoring_alert_policy" "pdf_processing_errors" {
     display_name = "A submission failed to process"
 
     condition_threshold {
-      filter          = "resource.type = \"cloud_run_revision\" AND metric.type = \"logging.googleapis.com/user/${google_logging_metric.pdf_processing_errors.name}\""
+      # Metric type only, with no resource.type clause. Monitoring validates
+      # the filter against the (metric, monitored resource) pairs it has
+      # actually seen, and a log-based metric that has never matched a log
+      # entry has no pairs registered — so naming a resource type is rejected:
+      #
+      #   Error 400: The supplied filter does not specify a valid combination
+      #   of metric and monitored resource descriptors.
+      #
+      # This metric has never recorded a point (that is the bug being fixed),
+      # so there is nothing to pair with yet. Filtering on the metric alone is
+      # the normal form for a log-based metric alert and is also more robust:
+      # the metric's own filter already scopes it to these two services, and
+      # it keeps working if either ever reports under a different resource
+      # type.
+      filter          = "metric.type = \"logging.googleapis.com/user/${google_logging_metric.pdf_processing_errors.name}\""
       duration        = "0s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0
