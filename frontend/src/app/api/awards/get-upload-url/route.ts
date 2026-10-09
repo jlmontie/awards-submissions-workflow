@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Storage } from '@google-cloud/storage';
+import {
+  MAX_PDF_SIZE,
+  MAX_PDF_SIZE_MB,
+  MAX_PHOTO_FILES,
+  MAX_PHOTO_SIZE,
+  MAX_PHOTO_SIZE_MB,
+} from '@/lib/awards/upload-limits';
 
 // Force this route to be dynamic (not pre-rendered at build time)
 export const dynamic = 'force-dynamic';
@@ -9,9 +16,6 @@ const storage = new Storage();
 const bucketName = process.env.NEXT_PUBLIC_GCS_BUCKET!;
 
 // File validation
-const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50MB
-const MAX_PHOTO_SIZE = 20 * 1024 * 1024; // 20MB
-
 const ALLOWED_PDF_TYPES = ['application/pdf'];
 const ALLOWED_PHOTO_TYPES = [
   'image/jpeg',
@@ -66,6 +70,7 @@ export async function POST(request: NextRequest) {
     const {
       filename,
       contentType,
+      size,
       submissionId,
       year,
       type, // 'pdf' or 'photos'
@@ -73,7 +78,7 @@ export async function POST(request: NextRequest) {
     } = body;
 
     // Validate required fields
-    if (!filename || !contentType || !submissionId || !year || !type) {
+    if (!filename || !contentType || !submissionId || !year || !type || typeof size !== 'number') {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -110,14 +115,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate file size
+    if (type === 'pdf' && size > MAX_PDF_SIZE) {
+      return NextResponse.json(
+        { error: `${filename} is larger than the ${MAX_PDF_SIZE_MB} MB limit for PDFs` },
+        { status: 400 }
+      );
+    }
+
+    if (type === 'photos' && size > MAX_PHOTO_SIZE) {
+      return NextResponse.json(
+        { error: `${filename} is larger than the ${MAX_PHOTO_SIZE_MB} MB limit for photos` },
+        { status: 400 }
+      );
+    }
+
     // Sanitize filename
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
 
     // Construct GCS path: submissions/YYYY/submission_id/type/filename
-    const gcsPath = `submissions/${year}/${submissionId}/${type}/${sanitizedFilename}`;
+    const typePrefix = `submissions/${year}/${submissionId}/${type}/`;
+    const gcsPath = `${typePrefix}${sanitizedFilename}`;
+
+    const bucket = storage.bucket(bucketName);
+
+    // Validate photo count. The form uploads photos a few at a time, so this
+    // counts what has already landed and can overshoot by one batch; the
+    // form's own check is what keeps honest submissions at the limit.
+    if (type === 'photos') {
+      const [existing] = await bucket.getFiles({
+        prefix: typePrefix,
+        autoPaginate: false,
+        maxResults: MAX_PHOTO_FILES,
+      });
+      if (existing.length >= MAX_PHOTO_FILES) {
+        return NextResponse.json(
+          { error: `A submission can include at most ${MAX_PHOTO_FILES} photos` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Generate signed URL for upload
-    const bucket = storage.bucket(bucketName);
     const file = bucket.file(gcsPath);
 
     const [uploadUrl] = await file.getSignedUrl({

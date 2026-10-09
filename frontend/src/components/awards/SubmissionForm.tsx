@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import FileUpload from './FileUpload';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  MAX_PDF_SIZE_MB,
+  MAX_PHOTO_FILES,
+  MAX_PHOTO_SIZE_MB,
+} from '@/lib/awards/upload-limits';
 
 interface SubmissionStatus {
   status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
@@ -114,6 +119,7 @@ export default function SubmissionForm() {
       body: JSON.stringify({
         filename: file.name,
         contentType: file.type,
+        size: file.size,
         submissionId,
         year,
         type,
@@ -122,7 +128,8 @@ export default function SubmissionForm() {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to get upload URL');
+      const { error } = await response.json().catch(() => ({}));
+      throw new Error(error || 'Failed to get upload URL');
     }
 
     const { uploadUrl } = await response.json();
@@ -222,6 +229,7 @@ export default function SubmissionForm() {
         <FileUpload
           accept=".pdf,application/pdf"
           maxFiles={1}
+          maxSizeMB={MAX_PDF_SIZE_MB}
           onFilesSelected={(files) => setPdfFile(files[0])}
           disabled={submissionStatus.status !== 'idle'}
         />
@@ -239,7 +247,8 @@ export default function SubmissionForm() {
         </label>
         <FileUpload
           accept="image/*"
-          maxFiles={999}
+          maxFiles={MAX_PHOTO_FILES}
+          maxSizeMB={MAX_PHOTO_SIZE_MB}
           multiple
           onFilesSelected={(files) => setPhotoFiles(files)}
           disabled={submissionStatus.status !== 'idle'}

@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone';
 interface FileUploadProps {
   accept: string;
   maxFiles: number;
+  maxSizeMB: number;
   multiple?: boolean;
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
@@ -14,6 +15,7 @@ interface FileUploadProps {
 export default function FileUpload({
   accept,
   maxFiles,
+  maxSizeMB,
   multiple = false,
   onFilesSelected,
   disabled = false,
@@ -33,9 +35,16 @@ export default function FileUpload({
         return acc;
       }, {} as Record<string, string[]>),
       maxFiles,
+      maxSize: maxSizeMB * 1024 * 1024,
       multiple,
       disabled,
     });
+
+  // Dropzone rejects every file when the count is over maxFiles, so report
+  // that once instead of listing each file.
+  const tooManyFiles = fileRejections.some(({ errors }) =>
+    errors.some((e) => e.code === 'too-many-files')
+  );
 
   return (
     <div>
@@ -73,21 +82,39 @@ export default function FileUpload({
                 select
               </p>
               <p className="text-sm text-gray-500">
-                {multiple ? `Up to 30 files` : '1 file only'}
+                {multiple ? `Up to ${maxFiles} files` : '1 file only'}, {maxSizeMB} MB max
+                {multiple ? ' each' : ''}
               </p>
+              {multiple && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Select all files at once. Choosing files again replaces
+                  your previous selection.
+                </p>
+              )}
             </>
           )}
         </div>
       </div>
 
-      {fileRejections.length > 0 && (
+      {tooManyFiles ? (
+        <p className="mt-2 text-sm text-red-600 font-medium">
+          You selected {fileRejections.length} files. Please select no more
+          than {maxFiles}.
+        </p>
+      ) : fileRejections.length > 0 && (
         <div className="mt-2 text-sm text-red-600">
           <p className="font-medium">Some files were rejected:</p>
           <ul className="list-disc list-inside">
             {fileRejections.map(({ file, errors }) => (
               <li key={file.name}>
                 {file.name}:{' '}
-                {errors.map((e) => e.message).join(', ')}
+                {errors
+                  .map((e) =>
+                    e.code === 'file-too-large'
+                      ? `File is larger than ${maxSizeMB} MB`
+                      : e.message
+                  )
+                  .join(', ')}
               </li>
             ))}
           </ul>
