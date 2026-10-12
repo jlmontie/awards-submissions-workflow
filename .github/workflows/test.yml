@@ -19,7 +19,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          # Not the Dockerfile's 18: the installed vitest needs node:util
+          # styleText, which 18 lacks. Tests aren't part of the image build.
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
