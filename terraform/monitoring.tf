@@ -140,7 +140,7 @@ resource "google_logging_metric" "frontend_api_errors" {
   depends_on = [google_project_service.required_apis]
   filter     = <<-EOT
     resource.type="cloud_run_revision"
-    resource.labels.service_name="${google_cloud_run_v2_service.frontend.name}"
+    resource.labels.service_name="${local.frontend_service_name}"
     httpRequest.status>=500
     httpRequest.requestUrl:"/api/"
   EOT
@@ -160,9 +160,10 @@ resource "google_monitoring_alert_policy" "frontend_api_errors" {
     display_name = "A frontend API route returned 5xx"
 
     condition_threshold {
-      # Metric type only, no resource.type — see the processing-errors
-      # policy above for why.
-      filter          = "metric.type = \"logging.googleapis.com/user/${google_logging_metric.frontend_api_errors.name}\""
+      # Unlike the policy above, this one names the resource type: creating
+      # a policy without it is rejected ("must specify a restriction on
+      # resource.type"). The metric only ever matches Cloud Run request logs.
+      filter          = "metric.type = \"logging.googleapis.com/user/${google_logging_metric.frontend_api_errors.name}\" AND resource.type = \"cloud_run_revision\""
       duration        = "0s"
       comparison      = "COMPARISON_GT"
       threshold_value = 0
@@ -189,7 +190,7 @@ resource "google_monitoring_alert_policy" "frontend_api_errors" {
       Check the logs:
 
           gcloud logging read 'resource.type="cloud_run_revision"
-            AND resource.labels.service_name="${google_cloud_run_v2_service.frontend.name}"
+            AND resource.labels.service_name="${local.frontend_service_name}"
             AND (httpRequest.status>=500 OR severity>=ERROR)' --freshness=1d --limit=20
 
       A PDF can land before a photo upload fails, and the PDF processor still
