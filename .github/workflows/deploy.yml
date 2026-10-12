@@ -59,9 +59,39 @@ jobs:
           docker push ${{ env.IMAGE }}:latest
           docker push ${{ env.IMAGE }}:${{ github.sha }}
 
-      - name: Deploy to Cloud Run
+      # The new revision is deployed with no traffic and smoke-tested at its
+      # own tagged URL before users reach it. A get-upload-url change once
+      # shipped needing a bucket permission the frontend didn't have, and
+      # every submission failed for three days; scripts/smoke-test.sh would
+      # have stopped it here.
+      #
+      # If the smoke test fails, the previous revision keeps serving and the
+      # bad one stays reachable only at its tag URL for debugging. Traffic is
+      # then pinned to the old revision, so don't `terraform apply` (which
+      # resets it to latest) until a fixed deploy has gone out.
+      - name: Set revision tag
+        run: echo "REVISION_TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Deploy to Cloud Run (no traffic)
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE }}
           region: ${{ env.REGION }}
           image: ${{ env.IMAGE }}:${{ github.sha }}
+          no_traffic: true
+          tag: ${{ env.REVISION_TAG }}
+
+      - name: Smoke test new revision
+        run: |
+          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --format=json \
+            | jq -r --arg tag "$REVISION_TAG" '.status.traffic[] | select(.tag == $tag) | .url')
+          if [[ -z "$url" ]]; then
+            echo "No URL found for tag $REVISION_TAG"
+            exit 1
+          fi
+          bash scripts/smoke-test.sh "$url"
+
+      - name: Route traffic to new revision
+        run: |
+          gcloud run services update-traffic "$SERVICE" --region "$REGION" \
+            --to-latest --remove-tags "$REVISION_TAG"

@@ -124,6 +124,82 @@ resource "google_monitoring_alert_policy" "pdf_processing_errors" {
   }
 }
 
+# Server errors from the frontend's API routes.
+#
+# Nothing watched the frontend before this. When a get-upload-url change
+# needed a bucket permission the frontend didn't have, every photo upload
+# returned 500 and submitters saw an error, but no one was told until a
+# submitter reported it. This would have fired on the first failed upload.
+#
+# Scoped to /api/ because page routes see scanner traffic that 500s on its
+# own (bogus Server Action POSTs to /login, /signin and the like); the API
+# routes had none in the 30 days before the outage.
+resource "google_logging_metric" "frontend_api_errors" {
+  name = "${local.shared_prefix}-frontend-api-5xx"
+
+  depends_on = [google_project_service.required_apis]
+  filter     = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="${google_cloud_run_v2_service.frontend.name}"
+    httpRequest.status>=500
+    httpRequest.requestUrl:"/api/"
+  EOT
+
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    unit        = "1"
+  }
+}
+
+resource "google_monitoring_alert_policy" "frontend_api_errors" {
+  display_name = "${local.shared_prefix} Frontend API Errors"
+  combiner     = "OR"
+
+  conditions {
+    display_name = "A frontend API route returned 5xx"
+
+    condition_threshold {
+      # Metric type only, no resource.type — see the processing-errors
+      # policy above for why.
+      filter          = "metric.type = \"logging.googleapis.com/user/${google_logging_metric.frontend_api_errors.name}\""
+      duration        = "0s"
+      comparison      = "COMPARISON_GT"
+      threshold_value = 0
+
+      aggregations {
+        alignment_period   = "300s"
+        per_series_aligner = "ALIGN_SUM"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+
+  alert_strategy {
+    auto_close = "86400s"
+  }
+
+  documentation {
+    content   = <<-EOT
+      A frontend API route returned a server error. If it is
+      /api/awards/get-upload-url, submissions are failing and submitters are
+      seeing an error on the form.
+
+      Check the logs:
+
+          gcloud logging read 'resource.type="cloud_run_revision"
+            AND resource.labels.service_name="${google_cloud_run_v2_service.frontend.name}"
+            AND (httpRequest.status>=500 OR severity>=ERROR)' --freshness=1d --limit=20
+
+      A PDF can land before a photo upload fails, and the PDF processor still
+      issues an Awards ID and sends a confirmation email for it. Check the
+      sheet for entries with no photos once the cause is fixed.
+    EOT
+    mime_type = "text/markdown"
+  }
+}
+
 # Email notification channel
 resource "google_monitoring_notification_channel" "email" {
   display_name = "Admin Email"

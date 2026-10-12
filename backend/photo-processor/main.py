@@ -143,6 +143,20 @@ def process_image(image_bytes: bytes, filename: str) -> tuple[bytes, str]:
         return image_bytes, mime_type
 
 
+def drive_query_literal(value: str) -> str:
+    """
+    Quote a value for use in a Drive API `q` string.
+
+    Drive delimits string values with single quotes and escapes with a
+    backslash, so any apostrophe in a raw value makes the query a 400.
+
+    Kept in sync with the copy in pdf-processor/main.py; the functions are
+    deployed from separate source directories and cannot share a module.
+    """
+    escaped = value.replace('\\', '\\\\').replace("'", "\\'")
+    return f"'{escaped}'"
+
+
 def find_folder_by_name(service, parent_id: str, folder_name: str) -> Optional[str]:
     """
     Find a folder by name in a parent folder.
@@ -155,7 +169,11 @@ def find_folder_by_name(service, parent_id: str, folder_name: str) -> Optional[s
     Returns:
         Folder ID if found, None otherwise
     """
-    query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
+    query = (
+        f"name={drive_query_literal(folder_name)} "
+        "and mimeType='application/vnd.google-apps.folder' "
+        f"and {drive_query_literal(parent_id)} in parents and trashed=false"
+    )
 
     results = service.files().list(
         q=query,
@@ -202,8 +220,9 @@ def get_project_folder(service, root_id: str, year: str,
     # than not filing them at all, because nothing looks wrong.
     query = (
         "mimeType='application/vnd.google-apps.folder' "
-        f"and '{year_folder_id}' in parents and trashed=false "
-        f"and appProperties has {{ key='submissionId' and value='{submission_id}' }}"
+        f"and {drive_query_literal(year_folder_id)} in parents and trashed=false "
+        "and appProperties has { key='submissionId' and value="
+        f"{drive_query_literal(submission_id)} }}"
     )
 
     results = service.files().list(
