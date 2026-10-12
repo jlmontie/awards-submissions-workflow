@@ -89,7 +89,7 @@ jobs:
             echo "No URL found for tag $REVISION_TAG"
             exit 1
           fi
-          scripts/smoke-test.sh "$url"
+          bash scripts/smoke-test.sh "$url"
 
       - name: Route traffic to new revision
         run: |
