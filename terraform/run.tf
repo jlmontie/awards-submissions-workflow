@@ -1,6 +1,6 @@
 # Cloud Run service for Next.js frontend
 resource "google_cloud_run_v2_service" "frontend" {
-  name     = "${local.shared_prefix}-frontend"
+  name     = local.frontend_service_name
   location = var.region
 
   labels = local.common_labels

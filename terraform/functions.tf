@@ -1,13 +1,17 @@
 # Archive backend source code for deployment
 data "archive_file" "pdf_processor_source" {
-  type        = "zip"
-  source_dir  = "${path.module}/../backend/pdf-processor"
+  type       = "zip"
+  source_dir = "${path.module}/../backend/pdf-processor"
+  # Local test runs leave bytecode here; it must not ship or change the hash.
+  excludes    = ["**/__pycache__/**"]
   output_path = "${path.module}/.terraform/tmp/pdf-processor.zip"
 }
 
 data "archive_file" "photo_processor_source" {
-  type        = "zip"
-  source_dir  = "${path.module}/../backend/photo-processor"
+  type       = "zip"
+  source_dir = "${path.module}/../backend/photo-processor"
+  # Local test runs leave bytecode here; it must not ship or change the hash.
+  excludes    = ["**/__pycache__/**"]
   output_path = "${path.module}/.terraform/tmp/photo-processor.zip"
 }
 
@@ -43,9 +47,13 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   }
 
   service_config {
-    max_instance_count             = 10
-    min_instance_count             = 0
-    available_memory               = "512M"
+    max_instance_count = 10
+    min_instance_count = 0
+    # 512M ran out (488 MiB usable, 495 used) on a warm instance working
+    # through repeated retries.
+    available_memory = "1Gi"
+    # Above 512Mi, Cloud Run requires more than the default 0.166 vCPU.
+    available_cpu                  = "1"
     timeout_seconds                = 540
     service_account_email          = google_service_account.backend.email
     ingress_settings               = "ALLOW_INTERNAL_ONLY"
@@ -127,9 +135,16 @@ resource "google_cloudfunctions2_function" "photo_processor" {
   }
 
   service_config {
-    max_instance_count             = 20
-    min_instance_count             = 0
-    available_memory               = "256M"
+    max_instance_count = 20
+    min_instance_count = 0
+    # 256M ran out on ordinary 20 MP camera JPEGs: decoding one peaks around
+    # 260 MiB, and a 48 MP phone photo (still under the 20 MB upload limit)
+    # around 430 MiB before the GCS and Drive clients are counted. An instance
+    # that runs out is killed and the event retried, so a photo too large to
+    # ever fit retries for 24h and is then dropped.
+    available_memory = "1Gi"
+    # Above 512Mi, Cloud Run requires more than the default 0.166 vCPU.
+    available_cpu                  = "1"
     timeout_seconds                = 120
     service_account_email          = google_service_account.backend.email
     ingress_settings               = "ALLOW_INTERNAL_ONLY"
@@ -186,9 +201,11 @@ resource "google_cloud_run_service_iam_member" "photo_processor_invoker" {
 # Only created when survey_sheet_id is configured
 
 data "archive_file" "survey_export_source" {
-  count       = var.survey_sheet_id != "" ? 1 : 0
-  type        = "zip"
-  source_dir  = "${path.module}/../backend/survey-export"
+  count      = var.survey_sheet_id != "" ? 1 : 0
+  type       = "zip"
+  source_dir = "${path.module}/../backend/survey-export"
+  # Local test runs leave bytecode here; it must not ship or change the hash.
+  excludes    = ["**/__pycache__/**"]
   output_path = "${path.module}/.terraform/tmp/survey-export.zip"
 }
 

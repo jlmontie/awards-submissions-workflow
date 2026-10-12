@@ -77,6 +77,12 @@ locals {
   awards_prefix = "${local.shared_prefix}-awards"
   survey_prefix = "${local.shared_prefix}-survey"
 
+  # The frontend Cloud Run service. Monitoring refers to it by this name, not
+  # by the resource: a reference makes `-target` on an alert drag in the
+  # service, whose label drift then rolls a new revision outside the deploy
+  # pipeline and its smoke test.
+  frontend_service_name = "${local.shared_prefix}-frontend"
+
   common_labels = {
     environment = var.environment
     managed_by  = "terraform"
