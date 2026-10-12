@@ -3,7 +3,6 @@ import { Storage } from '@google-cloud/storage';
 import {
   MAX_PDF_SIZE,
   MAX_PDF_SIZE_MB,
-  MAX_PHOTO_FILES,
   MAX_PHOTO_SIZE,
   MAX_PHOTO_SIZE_MB,
 } from '@/lib/awards/upload-limits';
@@ -134,29 +133,16 @@ export async function POST(request: NextRequest) {
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
 
     // Construct GCS path: submissions/YYYY/submission_id/type/filename
-    const typePrefix = `submissions/${year}/${submissionId}/${type}/`;
-    const gcsPath = `${typePrefix}${sanitizedFilename}`;
+    const gcsPath = `submissions/${year}/${submissionId}/${type}/${sanitizedFilename}`;
 
-    const bucket = storage.bucket(bucketName);
-
-    // Validate photo count. The form uploads photos a few at a time, so this
-    // counts what has already landed and can overshoot by one batch; the
-    // form's own check is what keeps honest submissions at the limit.
-    if (type === 'photos') {
-      const [existing] = await bucket.getFiles({
-        prefix: typePrefix,
-        autoPaginate: false,
-        maxResults: MAX_PHOTO_FILES,
-      });
-      if (existing.length >= MAX_PHOTO_FILES) {
-        return NextResponse.json(
-          { error: `A submission can include at most ${MAX_PHOTO_FILES} photos` },
-          { status: 400 }
-        );
-      }
-    }
+    // The photo count limit is enforced by the form only. Do not count
+    // existing objects here: listing the bucket needs storage.objects.list,
+    // which the frontend service account deliberately does not have (it can
+    // create objects, not read submissions). A listing check shipped once and
+    // failed every photo upload with a 500 until it was removed.
 
     // Generate signed URL for upload
+    const bucket = storage.bucket(bucketName);
     const file = bucket.file(gcsPath);
 
     const [uploadUrl] = await file.getSignedUrl({
@@ -171,9 +157,11 @@ export async function POST(request: NextRequest) {
       gcsPath,
     });
   } catch (error: any) {
+    // The detail stays in the logs. GCP errors name the service account and
+    // bucket, and the form shows this message to the submitter verbatim.
     console.error('Error generating upload URL:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to generate upload URL' },
+      { error: 'Upload failed. Please try again, or contact lmarshall@utahcdmag.com if it keeps happening.' },
       { status: 500 }
     );
   }

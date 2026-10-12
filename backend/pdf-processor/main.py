@@ -358,6 +358,22 @@ def format_team_for_sheet_row(awards_id: str, team_data: Dict[str, Dict[str, str
     ]
 
 
+def drive_query_literal(value: str) -> str:
+    """
+    Quote a value for use in a Drive API `q` string.
+
+    Drive delimits string values with single quotes and escapes with a
+    backslash. Interpolating a project name raw breaks on any apostrophe —
+    "Davis County Sheriff's Office ..." made every lookup a 400, and the
+    submission retried until the event expired.
+
+    Kept in sync with the copy in photo-processor/main.py; the functions are
+    deployed from separate source directories and cannot share a module.
+    """
+    escaped = value.replace('\\', '\\\\').replace("'", "\\'")
+    return f"'{escaped}'"
+
+
 def find_or_create_folder(service, parent_id: str, folder_name: str,
                           submission_id: Optional[str] = None) -> str:
     """
@@ -379,7 +395,11 @@ def find_or_create_folder(service, parent_id: str, folder_name: str,
         ID of found or created folder
     """
     # First, try to find existing folder
-    query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
+    query = (
+        f"name={drive_query_literal(folder_name)} "
+        "and mimeType='application/vnd.google-apps.folder' "
+        f"and {drive_query_literal(parent_id)} in parents and trashed=false"
+    )
 
     results = service.files().list(
         q=query,
