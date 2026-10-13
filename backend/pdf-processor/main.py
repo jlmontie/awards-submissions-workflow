@@ -817,7 +817,14 @@ def process_pdf(cloud_event):
         project_folder_id = find_or_create_folder(
             drive_service, year_folder_id, project_name, submission_id
         )
-        
+
+        # The Photos subfolder is made here, not by the photo processor. Its
+        # photos arrive together and run in parallel; when each one created
+        # Photos on a miss, several saw the miss at once and the submission
+        # ended up with two or three Photos folders, its photos split between
+        # them. This function runs once per submission, so nothing races it.
+        find_or_create_folder(drive_service, project_folder_id, "Photos")
+
         # Upload PDF to Drive
         file_id, file_link = upload_to_drive(
             drive_service,

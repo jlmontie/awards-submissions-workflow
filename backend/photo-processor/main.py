@@ -5,7 +5,9 @@ Organizes photos into Drive folders and optionally processes images.
 import os
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Optional
+import flask
 import functions_framework
 from google.cloud import storage, secretmanager
 from google.oauth2 import service_account
@@ -26,6 +28,12 @@ USER_OAUTH_TOKEN_SECRET = os.environ.get('USER_OAUTH_TOKEN_SECRET')
 SUBMISSIONS_BUCKET = os.environ.get('SUBMISSIONS_BUCKET')
 MAX_PHOTO_SIZE_MB = int(os.environ.get('MAX_PHOTO_SIZE_MB', 20))
 DRIVE_OWNER_EMAIL = os.environ.get('DRIVE_OWNER_EMAIL')  # Email of Drive folder owner
+
+# How long a photo waits for the PDF processor to create its folders before a
+# miss counts as a failure. The PDF processor takes a few seconds, so a miss
+# inside this window is the expected race between a submission's files, not
+# an error.
+FOLDER_GRACE_SECONDS = 600
 
 # Image processing settings
 MAX_DIMENSION = 4096  # Max width/height in pixels
@@ -278,6 +286,20 @@ def upload_photo_to_drive(service, photo_bytes: bytes, filename: str,
     return file.get('id')
 
 
+class FolderNotReady(Exception):
+    """The PDF processor has not created this submission's folders yet."""
+
+
+def event_age_seconds(cloud_event) -> float:
+    """Seconds since the photo landed in GCS.
+
+    Retries redeliver the original event, so this keeps growing across them.
+    """
+    created = cloud_event.data.get('timeCreated') or cloud_event['time']
+    created_at = datetime.fromisoformat(created.replace('Z', '+00:00'))
+    return (datetime.now(timezone.utc) - created_at).total_seconds()
+
+
 @functions_framework.cloud_event
 def process_photo(cloud_event):
     """
@@ -350,26 +372,16 @@ def process_photo(cloud_event):
         )
         
         if not project_folder_id:
-            logger.error(f"Could not find project folder for submission: {submission_id}")
-            # Retry later - PDF processor might not have run yet
-            raise ValueError("Project folder not found - will retry")
+            raise FolderNotReady(f"No project folder for submission {submission_id}")
 
-        # Find or create Photos subfolder
+        # Created by the PDF processor alongside the project folder. This
+        # function used to create it on a miss, but a submission's photos run
+        # in parallel, so several would miss at once and each make its own --
+        # leaving two or three Photos folders with the photos split between
+        # them. A miss now just means the PDF processor is mid-way through.
         photos_folder_id = find_folder_by_name(drive_service, project_folder_id, "Photos")
         if not photos_folder_id:
-            # Create Photos folder
-            file_metadata = {
-                'name': 'Photos',
-                'mimeType': 'application/vnd.google-apps.folder',
-                'parents': [project_folder_id]
-            }
-            folder = drive_service.files().create(
-                body=file_metadata,
-                fields='id',
-                supportsAllDrives=True
-            ).execute()
-            photos_folder_id = folder.get('id')
-            logger.info(f"Created Photos folder (ID: {photos_folder_id})")
+            raise FolderNotReady(f"No Photos folder for submission {submission_id}")
 
         # Upload photo to Photos subfolder
         file_id = upload_photo_to_drive(
@@ -388,6 +400,18 @@ def process_photo(cloud_event):
             'file_id': file_id
         }
         
+    except FolderNotReady as e:
+        # Photos usually beat the PDF processor to the folder. Inside the
+        # grace window, ask for a retry without logging an error: a 429 is
+        # retried like any non-2xx, but Cloud Run logs it as a warning, so it
+        # stays out of the processing-errors alert. Raising here would page on
+        # nearly every submission, which buries the failures that matter.
+        if event_age_seconds(cloud_event) < FOLDER_GRACE_SECONDS:
+            logger.warning(f"{e} yet - will retry")
+            flask.abort(429)
+        # Past the window the PDF processor has failed or never ran.
+        logger.error(f"{e} after {FOLDER_GRACE_SECONDS}s - will retry", exc_info=True)
+        raise
     except Exception as e:
         logger.error(f"Error processing photo: {e}", exc_info=True)
         # Re-raise to trigger retry
