@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   MAX_PDF_SIZE_MB,
   MAX_PHOTO_FILES,
+  MIN_PHOTO_FILES,
   MAX_PHOTO_SIZE_MB,
 } from '@/lib/awards/upload-limits';
 
@@ -247,6 +248,7 @@ export default function SubmissionForm() {
         </label>
         <FileUpload
           accept="image/*"
+          minFiles={MIN_PHOTO_FILES}
           maxFiles={MAX_PHOTO_FILES}
           maxSizeMB={MAX_PHOTO_SIZE_MB}
           multiple

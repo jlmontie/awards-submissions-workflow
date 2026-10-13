@@ -5,6 +5,7 @@ import { useDropzone } from 'react-dropzone';
 
 interface FileUploadProps {
   accept: string;
+  minFiles?: number;
   maxFiles: number;
   maxSizeMB: number;
   multiple?: boolean;
@@ -14,6 +15,7 @@ interface FileUploadProps {
 
 export default function FileUpload({
   accept,
+  minFiles,
   maxFiles,
   maxSizeMB,
   multiple = false,
@@ -82,11 +84,16 @@ export default function FileUpload({
                 select
               </p>
               <p className="text-sm text-gray-500">
-                {multiple ? `Up to ${maxFiles} files` : '1 file only'}, {maxSizeMB} MB max
+                {!multiple
+                  ? '1 file only'
+                  : minFiles
+                    ? `Minimum of ${minFiles} files with a limit of up to ${maxFiles}`
+                    : `Up to ${maxFiles} files`}
+                , {maxSizeMB} MB max
                 {multiple ? ' each' : ''}
               </p>
               {multiple && (
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-800 font-semibold mt-2">
                   Select all files at once. Choosing files again replaces
                   your previous selection.
                 </p>
