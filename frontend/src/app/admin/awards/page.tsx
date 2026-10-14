@@ -24,6 +24,8 @@ function SubmissionsContent() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     loadSubmissions();
@@ -39,6 +41,31 @@ function SubmissionsContent() {
       console.error('Error loading submissions:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    setExportError('');
+    try {
+      const res = await fetch('/api/awards/admin/export');
+      if (!res.ok) throw new Error('Export failed. Please try again.');
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download =
+        res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
+        'awards-submissions-by-category.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setExportError(err.message);
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -78,7 +105,15 @@ function SubmissionsContent() {
             All awards submissions for review and management
           </p>
         </div>
-        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
+        <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex sm:flex-none sm:gap-3">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            title="One row per project category, as an Excel table"
+            className="inline-flex items-center rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
+          >
+            {exporting ? 'Exporting…' : 'Export by Category (.xlsx)'}
+          </button>
           <Link
             href="/awards"
             target="_blank"
@@ -91,6 +126,10 @@ function SubmissionsContent() {
           </Link>
         </div>
       </div>
+
+      {exportError && (
+        <p className="mt-4 text-sm text-red-600">{exportError}</p>
+      )}
 
       {/* Filters */}
       <div className="mt-4 flex flex-col sm:flex-row gap-4">
