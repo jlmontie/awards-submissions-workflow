@@ -1,14 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
 import { buildCategoryExport, buildCategoryWorkbook } from '@/lib/awards/category-export';
+import { filterValuesByYear } from '@/lib/awards/sheet-rows';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 // Admin-only through the /api/awards/admin/:path* middleware matcher.
 // Read-only: it touches nothing the submission path uses.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const year = request.nextUrl.searchParams.get('year');
     const sheets = await getSheetsClient(true);
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId: process.env.AWARDS_SHEET_ID,
@@ -16,14 +18,15 @@ export async function GET() {
     });
 
     const workbook = await buildCategoryWorkbook(
-      buildCategoryExport((response.data.values as string[][]) || [])
+      buildCategoryExport(filterValuesByYear((response.data.values as string[][]) || [], year))
     );
 
     const date = new Date().toISOString().slice(0, 10);
+    const scope = year ? `${year}-` : '';
     return new NextResponse(workbook, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="awards-submissions-by-category-${date}.xlsx"`,
+        'Content-Disposition': `attachment; filename="awards-${scope}submissions-by-category-${date}.xlsx"`,
         'Cache-Control': 'no-store',
       },
     });
