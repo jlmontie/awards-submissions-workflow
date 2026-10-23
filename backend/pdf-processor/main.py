@@ -16,7 +16,9 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import PyPDF2
+import pikepdf
 import io
+import re
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -372,6 +374,101 @@ def drive_query_literal(value: str) -> str:
     """
     escaped = value.replace('\\', '\\\\').replace("'", "\\'")
     return f"'{escaped}'"
+
+
+def _inherited(obj, key):
+    """A form field attribute, looked up through the /Parent chain."""
+    while obj is not None:
+        if key in obj:
+            return obj[key]
+        obj = obj.get('/Parent')
+    return None
+
+
+def _drawn_text(widget) -> str:
+    """The text a field widget's stored appearance draws."""
+    ap = widget.get('/AP')
+    normal = ap.get('/N') if ap is not None else None
+    if not isinstance(normal, pikepdf.Stream):
+        return ''
+    parts = []
+    for operands, operator in pikepdf.parse_content_stream(normal):
+        op = str(operator)
+        if op == 'Tj':
+            parts.append(str(operands[0]))
+        elif op == 'TJ':
+            parts.extend(str(x) for x in operands[0] if isinstance(x, pikepdf.String))
+        elif op in ("'", '"'):
+            parts.append(str(operands[-1]))
+    return ''.join(parts)
+
+
+def _same_text(drawn: str, value: str) -> bool:
+    """Whether a widget draws its value. Line wrapping changes whitespace, and
+    non-ASCII characters (curly quotes, dashes) are encoded differently in the
+    drawing than in the value, so those positions are not compared."""
+    a, b = re.sub(r'\s+', '', drawn), re.sub(r'\s+', '', value)
+    return len(a) == len(b) and all(
+        x == y or ord(x) > 127 or ord(y) > 127 for x, y in zip(a, b)
+    )
+
+
+def drive_display_copy(pdf_bytes: bytes) -> bytes:
+    """
+    The copy of a submitted PDF to put in Drive, so it displays filled in.
+
+    Forms saved by macOS Preview set NeedAppearances, which tells viewers to
+    discard each field's drawn appearance and redraw it from the field's
+    value. Preview also drops the font list the fields name, so viewers that
+    honor the flag (Chrome's PDF viewer, Drive's preview) redraw nothing and
+    show the form blank. The values are intact, which is why the Sheet is
+    complete. In 2026, 9 of 121 submissions displayed blank in Drive.
+
+    Clearing the flag makes viewers show the appearances the form already
+    has. That is only done when it cannot change what a reader sees except
+    to un-blank it: the flag is set, the fields name a font the form does
+    not define, and every filled text field already draws its own value.
+    Anything else is returned unchanged, as is any PDF that fails to parse.
+    The original always stays in GCS, and the Sheet is filled from it.
+    """
+    try:
+        with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
+            acro = pdf.Root.get('/AcroForm')
+            if acro is None or not bool(acro.get('/NeedAppearances', False)):
+                return pdf_bytes
+
+            dr = acro.get('/DR')
+            fonts = dr.get('/Font') if dr is not None else None
+            defined = set(fonts.keys()) if fonts is not None else set()
+
+            filled, undefined_font = 0, False
+            for page in pdf.pages:
+                for widget in page.get('/Annots', []):
+                    if widget.get('/Subtype') != '/Widget' or _inherited(widget, '/FT') != '/Tx':
+                        continue
+                    value = _inherited(widget, '/V')
+                    value = str(value) if value is not None else ''
+                    if not value.strip():
+                        continue
+                    if not _same_text(_drawn_text(widget), value):
+                        return pdf_bytes
+                    da = str(_inherited(widget, '/DA') or acro.get('/DA') or '')
+                    font = re.search(r'(/\S+)\s+[\d.]+\s+Tf', da)
+                    if font and font.group(1) not in defined:
+                        undefined_font = True
+                    filled += 1
+
+            if not filled or not undefined_font:
+                return pdf_bytes
+
+            acro.NeedAppearances = False
+            out = io.BytesIO()
+            pdf.save(out)
+            logger.info(f"Cleared NeedAppearances on the Drive copy ({filled} filled fields)")
+            return out.getvalue()
+    except Exception as e:
+        logger.warning(f"Could not prepare a display copy, uploading the original: {e}")
+        return pdf_bytes
 
 
 def find_or_create_folder(service, parent_id: str, folder_name: str,
@@ -825,10 +922,11 @@ def process_pdf(cloud_event):
         # them. This function runs once per submission, so nothing races it.
         find_or_create_folder(drive_service, project_folder_id, "Photos")
 
-        # Upload PDF to Drive
+        # Upload PDF to Drive. The Drive copy may differ from the submission
+        # only so that it displays filled in; see drive_display_copy.
         file_id, file_link = upload_to_drive(
             drive_service,
-            pdf_bytes,
+            drive_display_copy(pdf_bytes),
             filename,
             project_folder_id
         )
