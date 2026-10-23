@@ -702,8 +702,9 @@ def format_confirmation_email(awards_id: str, project_name: str, contact_name: s
     Args:
         awards_id: Unique Awards ID (e.g., "AW-2025-042")
         project_name: Project name
-        contact_name: Submitter name
-        contact_email: Submitter email
+        contact_name: Name to greet; '' greets "Hello," (the recipient isn't
+            the PDF's contact)
+        contact_email: Recipient address
         fields: All extracted PDF fields
 
     Returns:
@@ -715,8 +716,9 @@ def format_confirmation_email(awards_id: str, project_name: str, contact_name: s
 
     subject = f"Award Submission Confirmed - {awards_id}"
 
+    greeting = f"Dear {contact_name}," if contact_name else "Hello,"
     body = f"""
-Dear {contact_name},
+{greeting}
 
 Thank you for submitting "{project_name}" to the {award_year} Utah Construction & Design Excellence Awards!
 
@@ -789,6 +791,8 @@ def send_confirmation_email(email_data: Dict[str, str]) -> bool:
     msg['Subject'] = email_data['subject']
     msg['From'] = SMTP_FROM
     msg['To'] = email_data['to']
+    if email_data.get('cc'):
+        msg['Cc'] = email_data['cc']
     msg.set_content(email_data['body'])
 
     try:
@@ -833,6 +837,79 @@ def submission_already_recorded(service, sheet_id: str, submission_id: str) -> b
         if row and row[0].strip() == submission_id:
             return True
     return False
+
+
+# Columns after the PDF's fields and the review columns, in this order. Their
+# headings are added to the sheet the first time they're needed.
+CONTACT_HEADERS = ['Submitter Email', 'Invoice Email']
+_contact_headers_checked = False
+
+
+def read_contact_emails(bucket_name: str, year: str, submission_id: str) -> Dict[str, str]:
+    """
+    The two addresses entered on the web form with the files: who submitted,
+    and who to invoice. The upload route writes them to meta/submission.json
+    before the PDF can be uploaded. Missing for submissions made before the
+    form asked, and for anything replayed without one; those get blanks.
+    """
+    path = f"submissions/{year}/{submission_id}/meta/submission.json"
+    try:
+        data = json.loads(storage_client.bucket(bucket_name).blob(path).download_as_bytes())
+        return {
+            'submitter': str(data.get('submitterEmail', '')).strip(),
+            'invoice': str(data.get('invoiceEmail', '')).strip(),
+        }
+    except Exception as e:
+        logger.warning(f"No contact emails for {submission_id} ({path}): {e}")
+        return {'submitter': '', 'invoice': ''}
+
+
+def _column_letter(index: int) -> str:
+    """0-based column index to A1 letters: 0 -> A, 60 -> BI."""
+    letters = ''
+    index += 1
+    while index:
+        index, rem = divmod(index - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def ensure_contact_headers(service, sheet_id: str, first_index: int):
+    """
+    Make sure Sheet1 is wide enough for the contact columns and that they
+    have headings. Sheet1 was exactly as wide as the old row, and the
+    Sheets API won't write past the grid. A heading someone has already put
+    in one of these cells is left alone. Checked once per instance.
+    """
+    global _contact_headers_checked
+    if _contact_headers_checked:
+        return
+
+    meta = service.spreadsheets().get(
+        spreadsheetId=sheet_id, fields='sheets.properties(sheetId,title,gridProperties)'
+    ).execute()
+    props = next(s['properties'] for s in meta['sheets'] if s['properties']['title'] == 'Sheet1')
+    needed = first_index + len(CONTACT_HEADERS)
+    have = props['gridProperties']['columnCount']
+    if have < needed:
+        service.spreadsheets().batchUpdate(spreadsheetId=sheet_id, body={'requests': [{
+            'appendDimension': {'sheetId': props['sheetId'], 'dimension': 'COLUMNS', 'length': needed - have}
+        }]}).execute()
+
+    first, last = _column_letter(first_index), _column_letter(needed - 1)
+    current = service.spreadsheets().values().get(
+        spreadsheetId=sheet_id, range=f'Sheet1!{first}1:{last}1'
+    ).execute().get('values', [[]])
+    current = (current[0] if current else []) + [''] * len(CONTACT_HEADERS)
+    if all(not c.strip() for c in current[:len(CONTACT_HEADERS)]):
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id, range=f'Sheet1!{first}1:{last}1',
+            valueInputOption='RAW', body={'values': [CONTACT_HEADERS]}
+        ).execute()
+        logger.info(f"Added sheet headings {CONTACT_HEADERS} at {first}1:{last}1")
+    elif current[:len(CONTACT_HEADERS)] != CONTACT_HEADERS:
+        logger.warning(f"Sheet1 {first}1:{last}1 has headings {current[:2]}, expected {CONTACT_HEADERS}")
+    _contact_headers_checked = True
 
 
 def append_to_sheet(service, sheet_id: str, values: list):
@@ -922,6 +999,7 @@ def process_pdf(cloud_event):
         # Extract form fields
         fields = extract_pdf_fields(pdf_bytes)
         logger.info(f"Extracted {len(fields)} fields from PDF")
+        contact = read_contact_emails(bucket_name, year, submission_id)
         
         # Use "Official Name" field for project folder name
         project_name = fields.get('Official Name', '').strip()
@@ -1038,26 +1116,36 @@ def process_pdf(cloud_event):
             'pending',                                                       # Status (pending/winner/not_selected)
             '',                                                              # Winner Category (empty initially)
             '',                                                              # Winner Notes (empty initially)
+            contact['submitter'],                                            # Submitter Email (web form)
+            contact['invoice'],                                              # Invoice Email (web form)
         ]
+
+        ensure_contact_headers(sheets_service, sheet_id, len(row_data) - len(CONTACT_HEADERS))
         
         # Append to master sheet
         append_to_sheet(sheets_service, sheet_id, row_data)
         
-        # Generate and log confirmation email
+        # Confirmation goes to whoever submitted (the web form's address),
+        # copying the project contact from the PDF when that's someone else.
+        # Older submissions without the web form's address go to the contact.
         contact_name = fields.get('Contact Name', 'Submitter')
-        contact_email = fields.get('Email', '')
-        
-        if contact_email:
+        contact_email = fields.get('Email', '').strip()
+        recipient = contact['submitter'] or contact_email
+
+        if recipient:
+            to_contact = recipient.lower() == contact_email.lower()
             email_data = format_confirmation_email(
                 awards_id=awards_id,
                 project_name=project_name,
-                contact_name=contact_name,
-                contact_email=contact_email,
+                contact_name=contact_name if to_contact else '',
+                contact_email=recipient,
                 fields=fields
             )
+            if contact_email and not to_contact:
+                email_data['cc'] = contact_email
             send_confirmation_email(email_data)
         else:
-            logger.warning("No contact email found - cannot send confirmation")
+            logger.warning("No submitter or contact email found - cannot send confirmation")
         
         logger.info(f"Successfully processed submission: {submission_id} ({awards_id})")
         

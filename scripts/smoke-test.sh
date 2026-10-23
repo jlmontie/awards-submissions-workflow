@@ -8,8 +8,11 @@
 # that needed a bucket permission the frontend never had, and every photo
 # upload 500'd for three days until a submitter reported it.
 #
-# Only signed URLs are requested; nothing is uploaded, so no submission is
-# created and no processor runs. The requests carry no reCAPTCHA token, which
+# Only signed URLs are requested; no files are uploaded, so no submission is
+# created and no processor does any work. While a year is open, the PDF
+# request does leave its small email record at
+# submissions/<year>/smoke-test-*/meta/submission.json; the processors skip
+# it, and the bucket's lifecycle rule removes it. The requests carry no reCAPTCHA token, which
 # the route currently accepts. If token checks are ever enforced, this script
 # needs a bypass for it or it will fail every deploy — on purpose.
 set -euo pipefail
@@ -39,7 +42,7 @@ upload_url() {
   check "upload URL for $type" "$expected" \
     -X POST "$BASE_URL/api/awards/get-upload-url" \
     -H 'Content-Type: application/json' \
-    -d "{\"filename\":\"$filename\",\"contentType\":\"$content_type\",\"size\":1024,\"submissionId\":\"$SUBMISSION_ID\",\"type\":\"$type\"}"
+    -d "{\"filename\":\"$filename\",\"contentType\":\"$content_type\",\"size\":1024,\"submissionId\":\"$SUBMISSION_ID\",\"type\":\"$type\",\"submitterEmail\":\"smoke-test@utahcdmag.com\",\"invoiceEmail\":\"smoke-test@utahcdmag.com\"}"
 }
 
 check "awards page" 200 "$BASE_URL/awards"

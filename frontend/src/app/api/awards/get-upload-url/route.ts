@@ -8,6 +8,7 @@ import {
 } from '@/lib/awards/upload-limits';
 import { getSheetsClient } from '@/lib/google-sheets';
 import { currentSubmissionWindow } from '@/lib/awards/award-years-store';
+import { parseContactEmails } from '@/lib/awards/contact-emails';
 
 // Force this route to be dynamic (not pre-rendered at build time)
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest) {
       type, // 'pdf' or 'photos'
       recaptchaToken,
     } = body;
+    // Required with the PDF: who is submitting, and who to invoice.
+    const contact = type === 'pdf' ? parseContactEmails(body) : null;
     // `body.year` is ignored. It came from the submitter's clock; the year is
     // now the open award year. Browsers holding the old page still send it.
 
@@ -100,6 +103,10 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.warn('No reCAPTCHA token provided - allowing for development');
+    }
+
+    if (contact && !contact.ok) {
+      return NextResponse.json({ error: contact.error }, { status: 400 });
     }
 
     // Validate file type
@@ -163,8 +170,27 @@ export async function POST(request: NextRequest) {
     // create objects, not read submissions). A listing check shipped once and
     // failed every photo upload with a 500 until it was removed.
 
-    // Generate signed URL for upload
     const bucket = storage.bucket(bucketName);
+
+    // The emails travel to the PDF processor as a small JSON file beside the
+    // submission, written here so it exists before the PDF can be uploaded.
+    // ifGenerationMatch: 0 only creates: the service account can't overwrite
+    // objects, and a repeated request for the same submission keeps the first.
+    if (contact?.ok) {
+      try {
+        await bucket
+          .file(`submissions/${year}/${submissionId}/meta/submission.json`)
+          .save(JSON.stringify({ ...contact.emails, recordedAt: new Date().toISOString() }), {
+            contentType: 'application/json',
+            resumable: false,
+            preconditionOpts: { ifGenerationMatch: 0 },
+          });
+      } catch (err: any) {
+        if (err?.code !== 412) throw err;
+      }
+    }
+
+    // Generate signed URL for upload
     const file = bucket.file(gcsPath);
 
     const [uploadUrl] = await file.getSignedUrl({

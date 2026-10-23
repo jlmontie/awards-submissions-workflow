@@ -155,6 +155,22 @@ time. Entries are accepted through the end of the closing day.
 Each year: add the year as a draft, set its dates, and open it when entries
 should start. Only one year can be open at a time.
 
+## Submitter and Invoice Emails
+
+The public form requires two addresses with the files: the person
+submitting, and who the entry fee is invoiced to. The upload route saves them
+to `submissions/<year>/<id>/meta/submission.json` before it hands out the
+PDF's upload URL, so the file is there when the PDF processor runs.
+
+- The processor writes them to Sheet1 as **Submitter Email** and **Invoice
+  Email**, right after Winner Notes. It widens the sheet and adds those two
+  headings the first time. A heading already in those cells is never
+  overwritten.
+- The confirmation email goes to the submitter, copying the contact from the
+  PDF if that's a different address.
+- Submissions from before these fields existed, or replayed without a meta
+  file, get blank columns and a confirmation to the PDF's contact as before.
+
 ---
 
 ## Step 7: Upload Blank PDF Form
