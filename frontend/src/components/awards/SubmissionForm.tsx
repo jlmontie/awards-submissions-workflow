@@ -9,6 +9,7 @@ import {
   MIN_PHOTO_FILES,
   MAX_PHOTO_SIZE_MB,
 } from '@/lib/awards/upload-limits';
+import { ContactEmails, isValidEmail } from '@/lib/awards/contact-emails';
 
 interface SubmissionStatus {
   status: 'idle' | 'uploading' | 'processing' | 'success' | 'error';
@@ -18,6 +19,9 @@ interface SubmissionStatus {
 export default function SubmissionForm() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [submitterEmail, setSubmitterEmail] = useState('');
+  const [invoiceEmail, setInvoiceEmail] = useState('');
+  const emailsValid = isValidEmail(submitterEmail) && isValidEmail(invoiceEmail);
   const [submissionStatus, setSubmissionStatus] = useState<SubmissionStatus>({
     status: 'idle',
   });
@@ -52,8 +56,12 @@ export default function SubmissionForm() {
         message: `Uploading PDF...`,
       });
 
-      // Upload PDF
-      await uploadFile(pdfFile, submissionId, year, 'pdf', recaptchaToken);
+      // Upload PDF. The emails go with it; the server records them for the
+      // processor before handing back the upload URL.
+      await uploadFile(pdfFile, submissionId, year, 'pdf', recaptchaToken, {
+        submitterEmail: submitterEmail.trim(),
+        invoiceEmail: invoiceEmail.trim(),
+      });
 
       setSubmissionStatus({
         status: 'uploading',
@@ -111,7 +119,8 @@ export default function SubmissionForm() {
     submissionId: string,
     year: string,
     type: 'pdf' | 'photos',
-    recaptchaToken: string
+    recaptchaToken: string,
+    contact?: ContactEmails
   ) => {
     // Get signed URL from API
     const response = await fetch('/api/awards/get-upload-url', {
@@ -125,6 +134,7 @@ export default function SubmissionForm() {
         year,
         type,
         recaptchaToken,
+        ...contact,
       }),
     });
 
@@ -222,6 +232,41 @@ export default function SubmissionForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Contact emails */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div>
+          <label htmlFor="submitter-email" className="block text-sm font-medium text-gray-700 mb-2">
+            Your Email *
+          </label>
+          <input
+            id="submitter-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={submitterEmail}
+            onChange={(e) => setSubmitterEmail(e.target.value)}
+            disabled={submissionStatus.status !== 'idle'}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-gray-500">Your confirmation is sent here.</p>
+        </div>
+        <div>
+          <label htmlFor="invoice-email" className="block text-sm font-medium text-gray-700 mb-2">
+            Email for Invoicing *
+          </label>
+          <input
+            id="invoice-email"
+            type="email"
+            required
+            value={invoiceEmail}
+            onChange={(e) => setInvoiceEmail(e.target.value)}
+            disabled={submissionStatus.status !== 'idle'}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+          />
+          <p className="mt-1 text-xs text-gray-500">Where the submission fee invoice should go.</p>
+        </div>
+      </div>
+
       {/* PDF Upload */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -291,6 +336,7 @@ export default function SubmissionForm() {
           disabled={
             !pdfFile ||
             photoFiles.length === 0 ||
+            !emailsValid ||
             submissionStatus.status !== 'idle'
           }
           className="flex-1 px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import { filterValuesByYear } from '@/lib/awards/sheet-rows';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,9 +17,9 @@ async function getSheetData() {
   return response.data.values || [];
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data = await getSheetData();
+    const data = filterValuesByYear(await getSheetData(), request.nextUrl.searchParams.get('year'));
 
     if (data.length < 2) {
       return NextResponse.json({

@@ -124,6 +124,67 @@ awards-production-frontend@YOUR_PROJECT_ID.iam.gserviceaccount.com
 
 Use **Viewer** (read-only) or **Editor** if winner marking will update the Sheet.
 
+**Award years need Editor.** Admin → Awards → Award Years writes to an
+`Award Years` tab in the awards Sheet (it creates the tab on first use), so
+the account the frontend uses for Sheets must be an **Editor** of the awards
+Sheet. That is the `client_email` in the `GOOGLE_SERVICE_ACCOUNT_KEY` secret
+(`ucd-production-sheets-sa-key`), which may differ from the Cloud Run service
+account above.
+
+---
+
+## Award Years
+
+Each year's competition is a row in the `Award Years` tab: its status
+(draft, open or closed) and optional opening and closing dates in Mountain
+time. Entries are accepted through the end of the closing day.
+
+- The public form takes entries only while a year is open, and files them
+  under that year: the GCS path, the Drive folder and the `AW-YYYY-NNN` id.
+  The year used to come from the submitter's browser clock.
+- Until a year has been opened or closed, the form keeps its old behavior:
+  always open, filed under the current calendar year. A year added as a draft
+  changes nothing.
+- Uploads keep working for 30 minutes after a close, so an entry already
+  underway can finish. The public page shows "closed" immediately.
+- A change reaches the public form within a minute (each instance caches the
+  tab for 60 seconds).
+- If Sheets can't be read, the form uses the last state it saw, or stays open
+  under the calendar year. A Sheets outage never turns entries away.
+
+Each year: add the year as a draft, set its dates, and open it when entries
+should start. Only one year can be open at a time.
+
+## Submitter and Invoice Emails
+
+The public form requires two addresses with the files: the person
+submitting, and who the entry fee is invoiced to. The upload route saves them
+to `submissions/<year>/<id>/meta/submission.json` before it hands out the
+PDF's upload URL, so the file is there when the PDF processor runs.
+
+- The processor writes them to Sheet1 under **Submitter Email** and
+  **Invoice Email**.
+- The confirmation email goes to the submitter, copying the contact from the
+  PDF if that's a different address.
+- Submissions from before these fields existed, or replayed without a meta
+  file, get blank columns and a confirmation to the PDF's contact as before.
+
+## The Submissions Sheet
+
+Every year shares one sheet, `Sheet1`. The processor writes each new row
+under its headings, wherever those columns are. The client can insert, move,
+hide or add columns, as long as the headings the processor uses keep their
+names (case and surrounding spaces don't matter). If one of those headings is
+missing, the processor adds it at the end rather than dropping the value.
+The duplicate check finds the **Submission ID** column by its heading too.
+
+- **Award Year** (column A) holds each row's year. The processor fills it
+  for new rows; `scripts/add-award-year-column.py` inserted it and filled it
+  for 2026.
+- Each year has a saved filter view, "<year> entries" (Data → Filter views),
+  showing only that year's rows. The admin's Award Years page creates it when
+  a year is added or opened.
+
 ---
 
 ## Step 7: Upload Blank PDF Form

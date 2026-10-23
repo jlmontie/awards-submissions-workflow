@@ -16,7 +16,9 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import PyPDF2
+import pikepdf
 import io
+import re
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +48,9 @@ CATEGORY_OTHER_FIELD = 'Category Other Specify'
 LEGACY_CATEGORY_FIELD = 'Project Category or Categories for Consideration'
 # A checkbox PyPDF2 reports with any of these is not ticked
 CHECKBOX_OFF_VALUES = {'', '/Off', 'Off', 'None'}
+
+# The awards sheet's main tab
+SHEET_TAB = 'Sheet1'
 
 # Initialize clients
 storage_client = storage.Client()
@@ -374,27 +379,117 @@ def drive_query_literal(value: str) -> str:
     return f"'{escaped}'"
 
 
-def find_or_create_folder(service, parent_id: str, folder_name: str,
-                          submission_id: Optional[str] = None) -> str:
+def _inherited(obj, key):
+    """A form field attribute, looked up through the /Parent chain."""
+    while obj is not None:
+        if key in obj:
+            return obj[key]
+        obj = obj.get('/Parent')
+    return None
+
+
+def _drawn_text(widget) -> str:
+    """The text a field widget's stored appearance draws."""
+    ap = widget.get('/AP')
+    normal = ap.get('/N') if ap is not None else None
+    if not isinstance(normal, pikepdf.Stream):
+        return ''
+    parts = []
+    for operands, operator in pikepdf.parse_content_stream(normal):
+        op = str(operator)
+        if op == 'Tj':
+            parts.append(str(operands[0]))
+        elif op == 'TJ':
+            parts.extend(str(x) for x in operands[0] if isinstance(x, pikepdf.String))
+        elif op in ("'", '"'):
+            parts.append(str(operands[-1]))
+    return ''.join(parts)
+
+
+def _same_text(drawn: str, value: str) -> bool:
+    """Whether a widget draws its value. Line wrapping changes whitespace, and
+    non-ASCII characters (curly quotes, dashes) are encoded differently in the
+    drawing than in the value, so those positions are not compared."""
+    a, b = re.sub(r'\s+', '', drawn), re.sub(r'\s+', '', value)
+    return len(a) == len(b) and all(
+        x == y or ord(x) > 127 or ord(y) > 127 for x, y in zip(a, b)
+    )
+
+
+def drive_display_copy(pdf_bytes: bytes) -> bytes:
     """
-    Find existing folder or create new one in Google Drive.
-    With impersonation, folders will be owned by the impersonated user.
+    The copy of a submitted PDF to put in Drive, so it displays filled in.
+
+    Forms saved by macOS Preview set NeedAppearances, which tells viewers to
+    discard each field's drawn appearance and redraw it from the field's
+    value. Preview also drops the font list the fields name, so viewers that
+    honor the flag (Chrome's PDF viewer, Drive's preview) redraw nothing and
+    show the form blank. The values are intact, which is why the Sheet is
+    complete. In 2026, 9 of 121 submissions displayed blank in Drive.
+
+    Clearing the flag makes viewers show the appearances the form already
+    has. That is only done when it cannot change what a reader sees except
+    to un-blank it: the flag is set, the fields name a font the form does
+    not define, and every filled text field already draws its own value.
+    Anything else is returned unchanged, as is any PDF that fails to parse.
+    The original always stays in GCS, and the Sheet is filled from it.
+    """
+    try:
+        with pikepdf.open(io.BytesIO(pdf_bytes)) as pdf:
+            acro = pdf.Root.get('/AcroForm')
+            if acro is None or not bool(acro.get('/NeedAppearances', False)):
+                return pdf_bytes
+
+            dr = acro.get('/DR')
+            fonts = dr.get('/Font') if dr is not None else None
+            defined = set(fonts.keys()) if fonts is not None else set()
+
+            filled, undefined_font = 0, False
+            for page in pdf.pages:
+                for widget in page.get('/Annots', []):
+                    if widget.get('/Subtype') != '/Widget' or _inherited(widget, '/FT') != '/Tx':
+                        continue
+                    value = _inherited(widget, '/V')
+                    value = str(value) if value is not None else ''
+                    if not value.strip():
+                        continue
+                    if not _same_text(_drawn_text(widget), value):
+                        return pdf_bytes
+                    da = str(_inherited(widget, '/DA') or acro.get('/DA') or '')
+                    font = re.search(r'(/\S+)\s+[\d.]+\s+Tf', da)
+                    if font and font.group(1) not in defined:
+                        undefined_font = True
+                    filled += 1
+
+            if not filled or not undefined_font:
+                return pdf_bytes
+
+            acro.NeedAppearances = False
+            out = io.BytesIO()
+            pdf.save(out)
+            logger.info(f"Cleared NeedAppearances on the Drive copy ({filled} filled fields)")
+            return out.getvalue()
+    except Exception as e:
+        logger.warning(f"Could not prepare a display copy, uploading the original: {e}")
+        return pdf_bytes
+
+
+def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
+    """
+    Find a folder by name under a parent, or create it.
+
+    For shared folders only: the year folder, and a project folder's Photos
+    subfolder. A submission's own folder is found by its id, never by name;
+    see find_or_create_project_folder.
 
     Args:
         service: Authenticated Drive service
         parent_id: Parent folder ID
         folder_name: Name for the folder
-        submission_id: Stamped onto the folder as appProperties.submissionId
-            when creating a project folder. This is the only durable link
-            between a folder and the submission that produced it — the folder
-            is named after the project, which the photo processor never sees,
-            so without the stamp it cannot tell one project's folder from
-            another's. Omitted for the year folder, which is shared.
 
     Returns:
         ID of found or created folder
     """
-    # First, try to find existing folder
     query = (
         f"name={drive_query_literal(folder_name)} "
         "and mimeType='application/vnd.google-apps.folder' "
@@ -414,28 +509,13 @@ def find_or_create_folder(service, parent_id: str, folder_name: str,
     if files:
         folder_id = files[0]['id']
         logger.info(f"Found existing folder: {folder_name} (ID: {folder_id})")
-        # A folder created before the stamp existed, or by an earlier
-        # submission with the same project name, still needs the id so the
-        # photo processor can find it.
-        if submission_id:
-            try:
-                service.files().update(
-                    fileId=folder_id,
-                    body={'appProperties': {'submissionId': submission_id}},
-                    supportsAllDrives=True,
-                ).execute()
-            except Exception as e:
-                logger.warning(f"Could not stamp submissionId on {folder_id}: {e}")
         return folder_id
 
-    # Folder doesn't exist, create it
     file_metadata = {
         'name': folder_name,
         'mimeType': 'application/vnd.google-apps.folder',
         'parents': [parent_id]
     }
-    if submission_id:
-        file_metadata['appProperties'] = {'submissionId': submission_id}
 
     try:
         folder = service.files().create(
@@ -449,6 +529,63 @@ def find_or_create_folder(service, parent_id: str, folder_name: str,
     except Exception as e:
         logger.error(f"Error creating folder '{folder_name}': {e}")
         raise
+
+
+def project_folder_name(project_name: str, awards_id: str) -> str:
+    """Project first, so Drive search and sorting group a project's entries;
+    the Awards ID makes it unique and matches the Sheet row."""
+    return f"{project_name} — {awards_id}"
+
+
+def find_or_create_project_folder(service, year_folder_id: str, submission_id: str,
+                                  folder_name: str) -> str:
+    """
+    The submission's own folder, found by the submissionId stamped on it.
+
+    The stamp is the folder's identity; the name is only a label. This used
+    to find the folder by project name and re-stamp it, so two entries with
+    the same project name shared one folder: in 2026 "Nusano" was entered by
+    two firms, and the second entry's stamp replaced the first's. Matching
+    on the stamp also makes retries land in the same folder, renaming it if
+    the label changed (a retry can be issued a different Awards ID).
+
+    The photo processor finds the folder by the same stamp.
+    """
+    query = (
+        "mimeType='application/vnd.google-apps.folder' "
+        f"and {drive_query_literal(year_folder_id)} in parents and trashed=false "
+        "and appProperties has { key='submissionId' and value="
+        f"{drive_query_literal(submission_id)} }}"
+    )
+    files = service.files().list(
+        q=query,
+        spaces='drive',
+        fields='files(id, name)',
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute().get('files', [])
+
+    if files:
+        folder = files[0]
+        if folder['name'] != folder_name:
+            service.files().update(
+                fileId=folder['id'], body={'name': folder_name}, supportsAllDrives=True
+            ).execute()
+            logger.info(f"Renamed folder {folder['id']} to {folder_name}")
+        return folder['id']
+
+    folder = service.files().create(
+        body={
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [year_folder_id],
+            'appProperties': {'submissionId': submission_id},
+        },
+        fields='id',
+        supportsAllDrives=True
+    ).execute()
+    logger.info(f"Created folder: {folder_name} (ID: {folder.get('id')})")
+    return folder.get('id')
 
 
 def upload_to_drive(service, file_bytes: bytes, filename: str,
@@ -568,8 +705,9 @@ def format_confirmation_email(awards_id: str, project_name: str, contact_name: s
     Args:
         awards_id: Unique Awards ID (e.g., "AW-2025-042")
         project_name: Project name
-        contact_name: Submitter name
-        contact_email: Submitter email
+        contact_name: Name to greet; '' greets "Hello," (the recipient isn't
+            the PDF's contact)
+        contact_email: Recipient address
         fields: All extracted PDF fields
 
     Returns:
@@ -581,8 +719,9 @@ def format_confirmation_email(awards_id: str, project_name: str, contact_name: s
 
     subject = f"Award Submission Confirmed - {awards_id}"
 
+    greeting = f"Dear {contact_name}," if contact_name else "Hello,"
     body = f"""
-Dear {contact_name},
+{greeting}
 
 Thank you for submitting "{project_name}" to the {award_year} Utah Construction & Design Excellence Awards!
 
@@ -655,6 +794,8 @@ def send_confirmation_email(email_data: Dict[str, str]) -> bool:
     msg['Subject'] = email_data['subject']
     msg['From'] = SMTP_FROM
     msg['To'] = email_data['to']
+    if email_data.get('cc'):
+        msg['Cc'] = email_data['cc']
     msg.set_content(email_data['body'])
 
     try:
@@ -678,16 +819,21 @@ def submission_already_recorded(service, sheet_id: str, submission_id: str) -> b
     """
     True if this submission already has a row in the master sheet.
 
-    Column B holds the GCS submission ID. Reading one column is cheap next to
-    the Drive work that follows, and it is what makes the trigger's retry
-    policy safe: without it, a retry of a run that failed after the row was
-    appended would upload the PDF twice, burn a second Awards ID and leave a
-    duplicate row for editorial to spot by eye.
+    Looks in the Submission ID column, found by its heading. Reading one
+    column is cheap next to the Drive work that follows, and it is what
+    makes the trigger's retry policy safe: without it, a retry of a run that
+    failed after the row was appended would upload the PDF twice, burn a
+    second Awards ID and leave a duplicate row for editorial to spot by eye.
     """
     try:
+        column = find_column(read_sheet_headers(service, sheet_id), 'Submission ID')
+        if column is None:
+            logger.warning("No Submission ID heading in the sheet; cannot check for an existing row")
+            return False
+        letter = _column_letter(column)
         result = service.spreadsheets().values().get(
             spreadsheetId=sheet_id,
-            range='Sheet1!B:B',
+            range=f'{SHEET_TAB}!{letter}:{letter}',
         ).execute()
     except Exception as e:
         # Never block a submission on this check — a false negative costs a
@@ -701,27 +847,97 @@ def submission_already_recorded(service, sheet_id: str, submission_id: str) -> b
     return False
 
 
-def append_to_sheet(service, sheet_id: str, values: list):
+def read_contact_emails(bucket_name: str, year: str, submission_id: str) -> Dict[str, str]:
     """
-    Append a row to Google Sheets.
-    
-    Args:
-        service: Authenticated Sheets service
-        sheet_id: Spreadsheet ID
-        values: List of values to append
+    The two addresses entered on the web form with the files: who submitted,
+    and who to invoice. The upload route writes them to meta/submission.json
+    before the PDF can be uploaded. Missing for submissions made before the
+    form asked, and for anything replayed without one; those get blanks.
     """
-    body = {
-        'values': [values]
-    }
-    
+    path = f"submissions/{year}/{submission_id}/meta/submission.json"
+    try:
+        data = json.loads(storage_client.bucket(bucket_name).blob(path).download_as_bytes())
+        return {
+            'submitter': str(data.get('submitterEmail', '')).strip(),
+            'invoice': str(data.get('invoiceEmail', '')).strip(),
+        }
+    except Exception as e:
+        logger.warning(f"No contact emails for {submission_id} ({path}): {e}")
+        return {'submitter': '', 'invoice': ''}
+
+
+def _column_letter(index: int) -> str:
+    """0-based column index to A1 letters: 0 -> A, 60 -> BI."""
+    letters = ''
+    index += 1
+    while index:
+        index, rem = divmod(index - 1, 26)
+        letters = chr(65 + rem) + letters
+    return letters
+
+
+def read_sheet_headers(service, sheet_id: str) -> List[str]:
+    """Sheet1's heading row, as the client currently has it arranged."""
+    result = service.spreadsheets().values().get(
+        spreadsheetId=sheet_id, range=f'{SHEET_TAB}!1:1'
+    ).execute()
+    rows = result.get('values', [])
+    return [str(h) for h in rows[0]] if rows else []
+
+
+def find_column(headers: List[str], name: str) -> Optional[int]:
+    """Index of a heading, ignoring case and surrounding spaces."""
+    wanted = name.strip().casefold()
+    for i, h in enumerate(headers):
+        if h.strip().casefold() == wanted:
+            return i
+    return None
+
+
+def append_row_by_header(service, sheet_id: str, row: Dict[str, Any]):
+    """
+    Append a submission's row, placing each value under its heading.
+
+    The sheet is edited by hand: the client adds categories, filters, and
+    may insert or move columns. Rows used to be written by position, so any
+    such change would have put every later submission's values under the
+    wrong headings without anyone noticing. Headings are read fresh each
+    time, columns the processor doesn't know are left blank, and a heading
+    the sheet lacks is added at the end (widening the grid if needed)
+    rather than dropped.
+    """
+    headers = read_sheet_headers(service, sheet_id)
+    missing = [name for name in row if find_column(headers, name) is None]
+    if missing:
+        meta = service.spreadsheets().get(
+            spreadsheetId=sheet_id, fields='sheets.properties(sheetId,title,gridProperties)'
+        ).execute()
+        props = next(s['properties'] for s in meta['sheets'] if s['properties']['title'] == SHEET_TAB)
+        needed, have = len(headers) + len(missing), props['gridProperties']['columnCount']
+        if have < needed:
+            service.spreadsheets().batchUpdate(spreadsheetId=sheet_id, body={'requests': [{
+                'appendDimension': {'sheetId': props['sheetId'], 'dimension': 'COLUMNS',
+                                    'length': needed - have}
+            }]}).execute()
+        first, last = _column_letter(len(headers)), _column_letter(needed - 1)
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id, range=f'{SHEET_TAB}!{first}1:{last}1',
+            valueInputOption='RAW', body={'values': [missing]}
+        ).execute()
+        logger.info(f"Added sheet headings {missing} at {first}1:{last}1")
+        headers = headers + missing
+
+    values = [''] * len(headers)
+    for name, value in row.items():
+        values[find_column(headers, name)] = '' if value is None else value
+
     result = service.spreadsheets().values().append(
         spreadsheetId=sheet_id,
-        range='Sheet1!A:Z',
+        range=f'{SHEET_TAB}!A1',
         valueInputOption='RAW',
         insertDataOption='INSERT_ROWS',
-        body=body
+        body={'values': [values]}
     ).execute()
-    
     logger.info(f"Appended row to sheet: {result.get('updates')}")
 
 
@@ -788,6 +1004,7 @@ def process_pdf(cloud_event):
         # Extract form fields
         fields = extract_pdf_fields(pdf_bytes)
         logger.info(f"Extracted {len(fields)} fields from PDF")
+        contact = read_contact_emails(bucket_name, year, submission_id)
         
         # Use "Official Name" field for project folder name
         project_name = fields.get('Official Name', '').strip()
@@ -811,11 +1028,18 @@ def process_pdf(cloud_event):
         # Initialize Drive service
         drive_service = get_drive_service()
         
+        # The Awards ID comes first because it is part of the folder's name.
+        # IDs are the highest in the sheet plus one, so two submissions
+        # processed at once could be given the same one; the function runs
+        # one instance at a time (terraform/functions.tf) to rule that out.
+        awards_id = generate_awards_id(sheets_service, sheet_id, year)
+        logger.info(f"Generated Awards ID: {awards_id} for submission {submission_id}")
+
         # Create folder structure: Root > Year > Project
-        # With impersonation, folders will be owned by the impersonated user
         year_folder_id = find_or_create_folder(drive_service, drive_root_id, year)
-        project_folder_id = find_or_create_folder(
-            drive_service, year_folder_id, project_name, submission_id
+        project_folder_id = find_or_create_project_folder(
+            drive_service, year_folder_id, submission_id,
+            project_folder_name(project_name, awards_id)
         )
 
         # The Photos subfolder is made here, not by the photo processor. Its
@@ -825,103 +1049,108 @@ def process_pdf(cloud_event):
         # them. This function runs once per submission, so nothing races it.
         find_or_create_folder(drive_service, project_folder_id, "Photos")
 
-        # Upload PDF to Drive
+        # Upload PDF to Drive. The Drive copy may differ from the submission
+        # only so that it displays filled in; see drive_display_copy.
         file_id, file_link = upload_to_drive(
             drive_service,
-            pdf_bytes,
+            drive_display_copy(pdf_bytes),
             filename,
             project_folder_id
         )
         
-        # sheet_id / sheets_service were resolved above for the duplicate check.
+        # The row, keyed by the sheet's headings. It is written under those
+        # headings wherever they are (see append_row_by_header), so the sheet's
+        # columns can be inserted, moved or hidden without misplacing values.
+        row = {
+            "Submission Timestamp":                             datetime.now().isoformat(),
+            "Submission ID":                                    submission_id,
+            "PDF Link":                                         file_link,
+            "Project Folder":                                   f"https://drive.google.com/drive/folders/{project_folder_id}",
+            "Official Name":                                    fields.get('Official Name', ''),
+            "Location":                                         fields.get('Location', ''),
+            "Project Category or Categories for Consideration": extract_project_categories(fields),
+            "Cost":                                             fields.get('Cost', ''),
+            "Date Completed":                                   fields.get('Date Completed', ''),
+            "Delivery Method":                                  fields.get('Delivery Method', ''),
+            "Square Feet":                                      fields.get('Square Feet', ''),
+            "LevelsStories 1":                                  fields.get('LevelsStories 1', ''),
+            "Name of Firm":                                     fields.get('Name of Firm', ''),
+            "Contact Name":                                     fields.get('Contact Name', ''),
+            "Title":                                            fields.get('Title', ''),
+            "Phone 1":                                          fields.get('Phone 1', ''),
+            "Email":                                            fields.get('Email', ''),
+            "Owner":                                            fields.get('Owner', ''),
+            "Owners RepProject Manager":                        fields.get('Owners RepProject Manager', ''),
+            "Design Team Firm PrincipalinCharge or Proj Mngr":  fields.get('Design Team Firm PrincipalinCharge or Proj Mngr', ''),
+            "Architect":                                        fields.get('Architect', ''),
+            "Civil":                                            fields.get('Civil', ''),
+            "Electrical":                                       fields.get('Electrical', ''),
+            "Mechanical":                                       fields.get('Mechanical', ''),
+            "Structural":                                       fields.get('Structural', ''),
+            "Geotech":                                          fields.get('Geotech', ''),
+            "Interior Design":                                  fields.get('Interior Design', ''),
+            "Furniture":                                        fields.get('Furniture', ''),
+            "Landscape Architect":                              fields.get('Landscape Architect', ''),
+            "Construction Team Firm Project Manager":           fields.get('Construction Team Firm Project Manager', ''),
+            "General Contractor":                               fields.get('General Contractor', ''),
+            "Plumbing":                                         fields.get('Plumbing', ''),
+            "HVAC":                                             fields.get('HVAC', ''),
+            "Electrical_2":                                     fields.get('Electrical_2', ''),
+            "Concrete":                                         fields.get('Concrete', ''),
+            "Steel Fabrication":                                fields.get('Steel Fabrication', ''),
+            "Steel Erection":                                   fields.get('Steel Erection', ''),
+            "GlassCurtain Wall":                                fields.get('GlassCurtain Wall', ''),
+            "Masonry":                                          fields.get('Masonry', ''),
+            "DrywallAcoustics":                                 fields.get('DrywallAcoustics', ''),
+            "Painting":                                         fields.get('Painting', ''),
+            "TileStone":                                        fields.get('TileStone', ''),
+            "Carpentry":                                        fields.get('Carpentry', ''),
+            "Flooring":                                         fields.get('Flooring', ''),
+            "Roofing":                                          fields.get('Roofing', ''),
+            "Waterproofing":                                    fields.get('Waterproofing', ''),
+            "Excavation":                                       fields.get('Excavation', ''),
+            "Demolition":                                       fields.get('Demolition', ''),
+            "Precast":                                          fields.get('Precast', ''),
+            "Landscaping 1":                                    fields.get('Landscaping 1', ''),
+            "Project Overview":                                 fields.get('Project Overview', ''),
+            "Innovation in Design and Construction":            fields.get('Innovation in Design and Construction', ''),
+            "Aesthetics/Design Elements":                       fields.get('Aesthetics/Design Elements', ''),
+            "Safety, Quality, Craftsmanship":                   fields.get('Safety, Quality, Craftsmanship', ''),
+            "Contribution to the Industry and Community":       fields.get('Contribution to the Industry and Community', ''),
+            "Overcoming Unique Challenges/Obstacles":           fields.get('Overcoming Unique Challenges/Obstacles', ''),
+            "Awards ID":                                        awards_id,
+            "Status":                                           'pending',
+            "Winner Category":                                  '',
+            "Winner Notes":                                     '',
+            "Submitter Email":                                  contact['submitter'],
+            "Invoice Email":                                    contact['invoice'],
+            "Award Year":                                       year,
+        }
 
-        # Generate unique Awards ID for this submission
-        awards_id = generate_awards_id(sheets_service, sheet_id, year)
-        logger.info(f"Generated Awards ID: {awards_id} for submission {submission_id}")
-        
-        # Build row data matching the exact column order from the Sheet
-        row_data = [
-            datetime.now().isoformat(),                                      # Submission Timestamp
-            submission_id,                                                   # Submission ID (GCS)
-            file_link,                                                       # PDF Link
-            f"https://drive.google.com/drive/folders/{project_folder_id}",  # Project Folder
-            fields.get('Official Name', ''),                                 # Official Name
-            fields.get('Location', ''),                                      # Location
-            extract_project_categories(fields),                              # Project Category
-            fields.get('Cost', ''),                                          # Cost
-            fields.get('Date Completed', ''),                                # Date Completed
-            fields.get('Delivery Method', ''),                               # Delivery Method
-            fields.get('Square Feet', ''),                                   # Square Feet
-            fields.get('LevelsStories 1', ''),                               # Levels/Stories
-            fields.get('Name of Firm', ''),                                  # Name of Firm
-            fields.get('Contact Name', ''),                                  # Contact Name
-            fields.get('Title', ''),                                         # Title
-            fields.get('Phone 1', ''),                                       # Phone
-            fields.get('Email', ''),                                         # Email
-            fields.get('Owner', ''),                                         # Owner
-            fields.get('Owners RepProject Manager', ''),                     # Owner's Rep/Project Manager
-            fields.get('Design Team Firm PrincipalinCharge or Proj Mngr', ''),  # Design Team Firm
-            fields.get('Architect', ''),                                     # Architect
-            fields.get('Civil', ''),                                         # Civil
-            fields.get('Electrical', ''),                                    # Electrical
-            fields.get('Mechanical', ''),                                    # Mechanical
-            fields.get('Structural', ''),                                    # Structural
-            fields.get('Geotech', ''),                                       # Geotech
-            fields.get('Interior Design', ''),                               # Interior Design
-            fields.get('Furniture', ''),                                     # Furniture
-            fields.get('Landscape Architect', ''),                           # Landscape Architect
-            fields.get('Construction Team Firm Project Manager', ''),        # Construction Team Firm
-            fields.get('General Contractor', ''),                            # General Contractor
-            fields.get('Plumbing', ''),                                      # Plumbing
-            fields.get('HVAC', ''),                                          # HVAC
-            fields.get('Electrical_2', ''),                                  # Electrical_2
-            fields.get('Concrete', ''),                                      # Concrete
-            fields.get('Steel Fabrication', ''),                             # Steel Fabrication
-            fields.get('Steel Erection', ''),                                # Steel Erection
-            fields.get('GlassCurtain Wall', ''),                             # Glass/Curtain Wall
-            fields.get('Masonry', ''),                                       # Masonry
-            fields.get('DrywallAcoustics', ''),                              # Drywall/Acoustics
-            fields.get('Painting', ''),                                      # Painting
-            fields.get('TileStone', ''),                                     # Tile/Stone
-            fields.get('Carpentry', ''),                                     # Carpentry
-            fields.get('Flooring', ''),                                      # Flooring
-            fields.get('Roofing', ''),                                       # Roofing
-            fields.get('Waterproofing', ''),                                 # Waterproofing
-            fields.get('Excavation', ''),                                    # Excavation
-            fields.get('Demolition', ''),                                    # Demolition
-            fields.get('Precast', ''),                                       # Precast
-            fields.get('Landscaping 1', ''),                                 # Landscaping
-            fields.get('Project Overview', ''),                              # Project Overview
-            fields.get('Innovation in Design and Construction', ''),         # Innovation
-            fields.get('Aesthetics/Design Elements', ''),                    # Aesthetics/Design Elements
-            fields.get('Safety, Quality, Craftsmanship', ''),                # Safety, Quality, Craftsmanship
-            fields.get('Contribution to the Industry and Community', ''),    # Contribution to Industry
-            fields.get('Overcoming Unique Challenges/Obstacles', ''),        # Overcoming Challenges
-            # NEW FIELDS for Phase 1: Awards ID System
-            awards_id,                                                       # Awards ID (AW-YYYY-NNN)
-            'pending',                                                       # Status (pending/winner/not_selected)
-            '',                                                              # Winner Category (empty initially)
-            '',                                                              # Winner Notes (empty initially)
-        ]
-        
         # Append to master sheet
-        append_to_sheet(sheets_service, sheet_id, row_data)
+        append_row_by_header(sheets_service, sheet_id, row)
         
-        # Generate and log confirmation email
+        # Confirmation goes to whoever submitted (the web form's address),
+        # copying the project contact from the PDF when that's someone else.
+        # Older submissions without the web form's address go to the contact.
         contact_name = fields.get('Contact Name', 'Submitter')
-        contact_email = fields.get('Email', '')
-        
-        if contact_email:
+        contact_email = fields.get('Email', '').strip()
+        recipient = contact['submitter'] or contact_email
+
+        if recipient:
+            to_contact = recipient.lower() == contact_email.lower()
             email_data = format_confirmation_email(
                 awards_id=awards_id,
                 project_name=project_name,
-                contact_name=contact_name,
-                contact_email=contact_email,
+                contact_name=contact_name if to_contact else '',
+                contact_email=recipient,
                 fields=fields
             )
+            if contact_email and not to_contact:
+                email_data['cc'] = contact_email
             send_confirmation_email(email_data)
         else:
-            logger.warning("No contact email found - cannot send confirmation")
+            logger.warning("No submitter or contact email found - cannot send confirmation")
         
         logger.info(f"Successfully processed submission: {submission_id} ({awards_id})")
         

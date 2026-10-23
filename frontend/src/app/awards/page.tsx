@@ -1,12 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FileUpload from '@/components/awards/FileUpload';
 import SubmissionForm from '@/components/awards/SubmissionForm';
 import RecaptchaLoader from '@/components/shared/RecaptchaLoader';
 
+type AwardsStatus =
+  | { accepting: true; year: string; closes: string | null }
+  | { accepting: false; year: string | null; reason: 'closed' | 'not_yet_open' | 'none' };
+
+function formatDeadline(date: string) {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 export default function AwardsPage() {
   const [submissionStarted, setSubmissionStarted] = useState(false);
+  // Until this loads, or if it can't, the form shows as usual: the upload
+  // route enforces the open/closed rule itself, so this only spares a
+  // submitter filling in a form that will be refused.
+  const [status, setStatus] = useState<AwardsStatus | null>(null);
+
+  useEffect(() => {
+    fetch('/api/awards/status')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(setStatus)
+      .catch(() => {});
+  }, []);
+
+  const closed = status !== null && !status.accepting;
 
   return (
     <main className="min-h-screen bg-white">
@@ -34,11 +56,29 @@ export default function AwardsPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-8 lg:px-12 py-16">
+        {closed ? (
+          <div className="bg-gray-50 border-l-4 border-secondary-400 p-8 mb-12">
+            <h2 className="text-4xl font-heading font-bold text-black mb-4">
+              Submissions are closed
+            </h2>
+            <p className="text-base font-light text-gray-500">
+              {status.reason === 'not_yet_open'
+                ? `Submissions for the ${status.year} competition are not open yet. Please check back soon.`
+                : 'Thank you for your interest. Submissions for this year’s competition are closed.'}
+            </p>
+          </div>
+        ) : (
+        <>
         {/* Instructions */}
         <div className="bg-gray-50 border-l-4 border-secondary-400 p-8 mb-12">
           <h2 className="text-4xl font-heading font-bold text-black mb-6">
             Submission Instructions
           </h2>
+          {status?.accepting && status.closes && (
+            <p className="text-base font-semibold text-black mb-4">
+              Submissions for {status.year} close at the end of {formatDeadline(status.closes)} (Mountain time).
+            </p>
+          )}
           <ol className="list-decimal list-inside space-y-3 text-base font-light text-gray-500">
             <li>
               Download the blank submission form below and fill it out completely
@@ -108,6 +148,8 @@ export default function AwardsPage() {
             <SubmissionForm />
           )}
         </div>
+        </>
+        )}
 
         {/* Footer */}
         <footer className="mt-16 pt-8 border-t-2 border-secondary-400 text-center">

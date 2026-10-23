@@ -47,7 +47,11 @@ resource "google_cloudfunctions2_function" "pdf_processor" {
   }
 
   service_config {
-    max_instance_count = 10
+    # One at a time. Awards IDs are the highest in the sheet plus one, so two
+    # PDFs processed at once could both be given the same ID. Submissions
+    # arrive minutes apart and take a few seconds each; an overlapping one
+    # is refused and retried by the trigger.
+    max_instance_count = 1
     min_instance_count = 0
     # 512M ran out (488 MiB usable, 495 used) on a warm instance working
     # through repeated retries.
