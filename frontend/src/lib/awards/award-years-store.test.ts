@@ -4,6 +4,7 @@ import {
   AwardYearError,
   createAwardYear,
   currentSubmissionWindow,
+  ensureYearFilterView,
   invalidateAwardYearsCache,
   readAwardYears,
   updateAwardYear,
@@ -18,20 +19,35 @@ function httpError(status: number) {
   return err;
 }
 
-/** A Sheets client over an in-memory Award Years tab (`null` = no tab). */
-function fakeSheets(initial: string[][] | null) {
+/**
+ * A Sheets client over an in-memory Award Years tab (`null` = no tab), plus
+ * the submissions tab's heading row and filter views.
+ */
+function fakeSheets(
+  initial: string[][] | null,
+  { submissionHeaders = ['Award Year', 'Awards ID'], filterViews = [] as string[] } = {}
+) {
   let tab = initial;
+  const views = [...filterViews];
   const client = {
     spreadsheets: {
       get: vi.fn(async () => ({
-        data: { sheets: [{ properties: { title: 'Sheet1' } }, ...(tab ? [{ properties: { title: 'Award Years' } }] : [])] },
+        data: {
+          sheets: [
+            { properties: { sheetId: 0, title: 'Sheet1' }, filterViews: views.map((title) => ({ title })) },
+            ...(tab ? [{ properties: { sheetId: 9, title: 'Award Years' } }] : []),
+          ],
+        },
       })),
-      batchUpdate: vi.fn(async () => {
-        tab = [];
+      batchUpdate: vi.fn(async ({ requestBody }: any) => {
+        const request = requestBody.requests[0];
+        if (request.addSheet) tab = [];
+        if (request.addFilterView) views.push(request.addFilterView.filter.title);
         return {};
       }),
       values: {
-        get: vi.fn(async () => {
+        get: vi.fn(async ({ range }: any) => {
+          if (range === 'Sheet1!1:1') return { data: { values: [submissionHeaders] } };
           if (!tab) throw httpError(400);
           return { data: { values: tab } };
         }),
@@ -47,7 +63,7 @@ function fakeSheets(initial: string[][] | null) {
       },
     },
   };
-  return { client: client as unknown as SheetsClient, raw: client, tab: () => tab };
+  return { client: client as unknown as SheetsClient, raw: client, tab: () => tab, views: () => views };
 }
 
 beforeEach(() => {
@@ -131,7 +147,9 @@ describe('createAwardYear', () => {
   it('creates the tab with headers on first use', async () => {
     const sheets = fakeSheets(null);
     await createAwardYear(sheets.client, { year: '2027' }, 'admin@x', now);
-    expect(sheets.raw.spreadsheets.batchUpdate).toHaveBeenCalledOnce();
+    expect(sheets.raw.spreadsheets.batchUpdate.mock.calls[0][0]).toMatchObject({
+      requestBody: { requests: [{ addSheet: { properties: { title: 'Award Years' } } }] },
+    });
     expect(sheets.tab()).toEqual([
       HEADER,
       ['2027', 'draft', '', '', '', now.toISOString(), 'admin@x'],
@@ -184,5 +202,59 @@ describe('updateAwardYear', () => {
     await expect(updateAwardYear(client, '2030', { status: 'open' }, 'a', now)).rejects.toMatchObject({
       status: 404,
     });
+  });
+});
+
+describe('ensureYearFilterView', () => {
+  const addFilterView = (sheets: ReturnType<typeof fakeSheets>) =>
+    sheets.raw.spreadsheets.batchUpdate.mock.calls
+      .map((c: any) => c[0].requestBody.requests[0].addFilterView)
+      .filter(Boolean);
+
+  it('adds a view filtering the Award Year column', async () => {
+    const sheets = fakeSheets([HEADER], { submissionHeaders: ['Submission Timestamp', 'Award Year'] });
+    await ensureYearFilterView(sheets.client, '2027');
+    expect(addFilterView(sheets)).toEqual([{
+      filter: {
+        title: '2027 entries',
+        range: { sheetId: 0 },
+        filterSpecs: [{ columnIndex: 1, filterCriteria: { condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: '2027' }] } } }],
+      },
+    }]);
+  });
+
+  it('falls back to the Awards ID prefix without an Award Year column', async () => {
+    const sheets = fakeSheets([HEADER], { submissionHeaders: ['Official Name', 'Awards ID'] });
+    await ensureYearFilterView(sheets.client, '2027');
+    expect(addFilterView(sheets)[0].filter.filterSpecs).toEqual([
+      { columnIndex: 1, filterCriteria: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: 'AW-2027-' }] } } },
+    ]);
+  });
+
+  it('leaves an existing view alone', async () => {
+    const sheets = fakeSheets([HEADER], { filterViews: ['2027 entries'] });
+    await ensureYearFilterView(sheets.client, '2027');
+    expect(addFilterView(sheets)).toEqual([]);
+  });
+
+  it('never fails the caller', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const sheets = fakeSheets([HEADER]);
+    sheets.raw.spreadsheets.get.mockRejectedValueOnce(httpError(403));
+    await expect(ensureYearFilterView(sheets.client, '2027')).resolves.toBeUndefined();
+  });
+
+  it('is added when a year is created, and when one is opened', async () => {
+    const sheets = fakeSheets([HEADER, ['2026', 'closed']]);
+    await createAwardYear(sheets.client, { year: '2027' }, 'a', new Date('2026-10-23T00:00:00Z'));
+    expect(sheets.views()).toEqual(['2027 entries']);
+    await updateAwardYear(sheets.client, '2026', { status: 'open' }, 'a', new Date('2026-10-23T00:00:00Z'));
+    expect(sheets.views()).toEqual(['2027 entries', '2026 entries']);
+  });
+
+  it('is not touched when a year is closed', async () => {
+    const sheets = fakeSheets([HEADER, ['2026', 'open']]);
+    await updateAwardYear(sheets.client, '2026', { status: 'closed' }, 'a', new Date('2026-10-23T00:00:00Z'));
+    expect(sheets.views()).toEqual([]);
   });
 });

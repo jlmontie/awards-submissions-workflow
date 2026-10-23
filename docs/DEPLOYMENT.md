@@ -162,14 +162,28 @@ submitting, and who the entry fee is invoiced to. The upload route saves them
 to `submissions/<year>/<id>/meta/submission.json` before it hands out the
 PDF's upload URL, so the file is there when the PDF processor runs.
 
-- The processor writes them to Sheet1 as **Submitter Email** and **Invoice
-  Email**, right after Winner Notes. It widens the sheet and adds those two
-  headings the first time. A heading already in those cells is never
-  overwritten.
+- The processor writes them to Sheet1 under **Submitter Email** and
+  **Invoice Email**.
 - The confirmation email goes to the submitter, copying the contact from the
   PDF if that's a different address.
 - Submissions from before these fields existed, or replayed without a meta
   file, get blank columns and a confirmation to the PDF's contact as before.
+
+## The Submissions Sheet
+
+Every year shares one sheet, `Sheet1`. The processor writes each new row
+under its headings, wherever those columns are. The client can insert, move,
+hide or add columns, as long as the headings the processor uses keep their
+names (case and surrounding spaces don't matter). If one of those headings is
+missing, the processor adds it at the end rather than dropping the value.
+The duplicate check finds the **Submission ID** column by its heading too.
+
+- **Award Year** (column A) holds each row's year. The processor fills it
+  for new rows; `scripts/add-award-year-column.py` inserted it and filled it
+  for 2026.
+- Each year has a saved filter view, "<year> entries" (Data → Filter views),
+  showing only that year's rows. The admin's Award Years page creates it when
+  a year is added or opened.
 
 ---
 

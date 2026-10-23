@@ -15,6 +15,8 @@ import {
 } from './award-years';
 
 const RANGE = `'${AWARD_YEARS_TAB}'!A:G`;
+// Where the processor writes submissions.
+const SUBMISSIONS_TAB = 'Sheet1';
 
 export interface AwardYearsSnapshot {
   /**
@@ -158,6 +160,49 @@ async function ensureTab(sheets: SheetsClient) {
   });
 }
 
+/**
+ * A saved filter view on the submissions tab showing one year's rows, so the
+ * client can switch between years in the sheet itself without changing its
+ * columns or anyone else's view. Filters on the Award Year column, or on the
+ * Awards ID prefix where that column doesn't exist. Created once per year;
+ * an existing view of the same title is left as the client may have edited it.
+ *
+ * Best-effort: a failure here is logged and never fails saving the year.
+ */
+export async function ensureYearFilterView(sheets: SheetsClient, year: string): Promise<void> {
+  const spreadsheetId = sheetId();
+  const title = `${year} entries`;
+  try {
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId,
+      fields: 'sheets(properties(sheetId,title),filterViews(title))',
+    });
+    const tab = meta.data.sheets?.find((s) => s.properties?.title === SUBMISSIONS_TAB);
+    if (!tab || tab.filterViews?.some((v) => v.title === title)) return;
+
+    const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBMISSIONS_TAB}!1:1` });
+    const headers = ((headerRes.data.values?.[0] as string[]) || []).map((h) => String(h).trim().toLowerCase());
+    const yearCol = headers.indexOf('award year');
+    const idCol = headers.indexOf('awards id');
+    const spec =
+      yearCol >= 0
+        ? { columnIndex: yearCol, filterCriteria: { condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: year }] } } }
+        : idCol >= 0
+          ? { columnIndex: idCol, filterCriteria: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: `AW-${year}-` }] } } }
+          : null;
+    if (!spec) return;
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [{ addFilterView: { filter: { title, range: { sheetId: tab.properties!.sheetId }, filterSpecs: [spec] } } }],
+      },
+    });
+  } catch (err) {
+    console.error(`Could not create the "${title}" filter view:`, err);
+  }
+}
+
 export async function createAwardYear(
   sheets: SheetsClient,
   input: AwardYearInput,
@@ -189,6 +234,7 @@ export async function createAwardYear(
     requestBody: { values: [toRow(next)] },
   });
   invalidateAwardYearsCache();
+  await ensureYearFilterView(sheets, year);
   return next;
 }
 
@@ -232,5 +278,6 @@ export async function updateAwardYear(
     requestBody: { values: [toRow(next)] },
   });
   invalidateAwardYearsCache();
+  if (status === 'open') await ensureYearFilterView(sheets, year);
   return next;
 }

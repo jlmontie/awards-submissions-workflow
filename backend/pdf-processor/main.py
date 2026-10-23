@@ -49,6 +49,9 @@ LEGACY_CATEGORY_FIELD = 'Project Category or Categories for Consideration'
 # A checkbox PyPDF2 reports with any of these is not ticked
 CHECKBOX_OFF_VALUES = {'', '/Off', 'Off', 'None'}
 
+# The awards sheet's main tab
+SHEET_TAB = 'Sheet1'
+
 # Initialize clients
 storage_client = storage.Client()
 secret_client = secretmanager.SecretManagerServiceClient()
@@ -816,16 +819,21 @@ def submission_already_recorded(service, sheet_id: str, submission_id: str) -> b
     """
     True if this submission already has a row in the master sheet.
 
-    Column B holds the GCS submission ID. Reading one column is cheap next to
-    the Drive work that follows, and it is what makes the trigger's retry
-    policy safe: without it, a retry of a run that failed after the row was
-    appended would upload the PDF twice, burn a second Awards ID and leave a
-    duplicate row for editorial to spot by eye.
+    Looks in the Submission ID column, found by its heading. Reading one
+    column is cheap next to the Drive work that follows, and it is what
+    makes the trigger's retry policy safe: without it, a retry of a run that
+    failed after the row was appended would upload the PDF twice, burn a
+    second Awards ID and leave a duplicate row for editorial to spot by eye.
     """
     try:
+        column = find_column(read_sheet_headers(service, sheet_id), 'Submission ID')
+        if column is None:
+            logger.warning("No Submission ID heading in the sheet; cannot check for an existing row")
+            return False
+        letter = _column_letter(column)
         result = service.spreadsheets().values().get(
             spreadsheetId=sheet_id,
-            range='Sheet1!B:B',
+            range=f'{SHEET_TAB}!{letter}:{letter}',
         ).execute()
     except Exception as e:
         # Never block a submission on this check — a false negative costs a
@@ -837,12 +845,6 @@ def submission_already_recorded(service, sheet_id: str, submission_id: str) -> b
         if row and row[0].strip() == submission_id:
             return True
     return False
-
-
-# Columns after the PDF's fields and the review columns, in this order. Their
-# headings are added to the sheet the first time they're needed.
-CONTACT_HEADERS = ['Submitter Email', 'Invoice Email']
-_contact_headers_checked = False
 
 
 def read_contact_emails(bucket_name: str, year: str, submission_id: str) -> Dict[str, str]:
@@ -874,65 +876,68 @@ def _column_letter(index: int) -> str:
     return letters
 
 
-def ensure_contact_headers(service, sheet_id: str, first_index: int):
-    """
-    Make sure Sheet1 is wide enough for the contact columns and that they
-    have headings. Sheet1 was exactly as wide as the old row, and the
-    Sheets API won't write past the grid. A heading someone has already put
-    in one of these cells is left alone. Checked once per instance.
-    """
-    global _contact_headers_checked
-    if _contact_headers_checked:
-        return
-
-    meta = service.spreadsheets().get(
-        spreadsheetId=sheet_id, fields='sheets.properties(sheetId,title,gridProperties)'
+def read_sheet_headers(service, sheet_id: str) -> List[str]:
+    """Sheet1's heading row, as the client currently has it arranged."""
+    result = service.spreadsheets().values().get(
+        spreadsheetId=sheet_id, range=f'{SHEET_TAB}!1:1'
     ).execute()
-    props = next(s['properties'] for s in meta['sheets'] if s['properties']['title'] == 'Sheet1')
-    needed = first_index + len(CONTACT_HEADERS)
-    have = props['gridProperties']['columnCount']
-    if have < needed:
-        service.spreadsheets().batchUpdate(spreadsheetId=sheet_id, body={'requests': [{
-            'appendDimension': {'sheetId': props['sheetId'], 'dimension': 'COLUMNS', 'length': needed - have}
-        }]}).execute()
+    rows = result.get('values', [])
+    return [str(h) for h in rows[0]] if rows else []
 
-    first, last = _column_letter(first_index), _column_letter(needed - 1)
-    current = service.spreadsheets().values().get(
-        spreadsheetId=sheet_id, range=f'Sheet1!{first}1:{last}1'
-    ).execute().get('values', [[]])
-    current = (current[0] if current else []) + [''] * len(CONTACT_HEADERS)
-    if all(not c.strip() for c in current[:len(CONTACT_HEADERS)]):
-        service.spreadsheets().values().update(
-            spreadsheetId=sheet_id, range=f'Sheet1!{first}1:{last}1',
-            valueInputOption='RAW', body={'values': [CONTACT_HEADERS]}
+
+def find_column(headers: List[str], name: str) -> Optional[int]:
+    """Index of a heading, ignoring case and surrounding spaces."""
+    wanted = name.strip().casefold()
+    for i, h in enumerate(headers):
+        if h.strip().casefold() == wanted:
+            return i
+    return None
+
+
+def append_row_by_header(service, sheet_id: str, row: Dict[str, Any]):
+    """
+    Append a submission's row, placing each value under its heading.
+
+    The sheet is edited by hand: the client adds categories, filters, and
+    may insert or move columns. Rows used to be written by position, so any
+    such change would have put every later submission's values under the
+    wrong headings without anyone noticing. Headings are read fresh each
+    time, columns the processor doesn't know are left blank, and a heading
+    the sheet lacks is added at the end (widening the grid if needed)
+    rather than dropped.
+    """
+    headers = read_sheet_headers(service, sheet_id)
+    missing = [name for name in row if find_column(headers, name) is None]
+    if missing:
+        meta = service.spreadsheets().get(
+            spreadsheetId=sheet_id, fields='sheets.properties(sheetId,title,gridProperties)'
         ).execute()
-        logger.info(f"Added sheet headings {CONTACT_HEADERS} at {first}1:{last}1")
-    elif current[:len(CONTACT_HEADERS)] != CONTACT_HEADERS:
-        logger.warning(f"Sheet1 {first}1:{last}1 has headings {current[:2]}, expected {CONTACT_HEADERS}")
-    _contact_headers_checked = True
+        props = next(s['properties'] for s in meta['sheets'] if s['properties']['title'] == SHEET_TAB)
+        needed, have = len(headers) + len(missing), props['gridProperties']['columnCount']
+        if have < needed:
+            service.spreadsheets().batchUpdate(spreadsheetId=sheet_id, body={'requests': [{
+                'appendDimension': {'sheetId': props['sheetId'], 'dimension': 'COLUMNS',
+                                    'length': needed - have}
+            }]}).execute()
+        first, last = _column_letter(len(headers)), _column_letter(needed - 1)
+        service.spreadsheets().values().update(
+            spreadsheetId=sheet_id, range=f'{SHEET_TAB}!{first}1:{last}1',
+            valueInputOption='RAW', body={'values': [missing]}
+        ).execute()
+        logger.info(f"Added sheet headings {missing} at {first}1:{last}1")
+        headers = headers + missing
 
+    values = [''] * len(headers)
+    for name, value in row.items():
+        values[find_column(headers, name)] = '' if value is None else value
 
-def append_to_sheet(service, sheet_id: str, values: list):
-    """
-    Append a row to Google Sheets.
-    
-    Args:
-        service: Authenticated Sheets service
-        sheet_id: Spreadsheet ID
-        values: List of values to append
-    """
-    body = {
-        'values': [values]
-    }
-    
     result = service.spreadsheets().values().append(
         spreadsheetId=sheet_id,
-        range='Sheet1!A:Z',
+        range=f'{SHEET_TAB}!A1',
         valueInputOption='RAW',
         insertDataOption='INSERT_ROWS',
-        body=body
+        body={'values': [values]}
     ).execute()
-    
     logger.info(f"Appended row to sheet: {result.get('updates')}")
 
 
@@ -1053,77 +1058,77 @@ def process_pdf(cloud_event):
             project_folder_id
         )
         
-        # Build row data matching the exact column order from the Sheet
-        row_data = [
-            datetime.now().isoformat(),                                      # Submission Timestamp
-            submission_id,                                                   # Submission ID (GCS)
-            file_link,                                                       # PDF Link
-            f"https://drive.google.com/drive/folders/{project_folder_id}",  # Project Folder
-            fields.get('Official Name', ''),                                 # Official Name
-            fields.get('Location', ''),                                      # Location
-            extract_project_categories(fields),                              # Project Category
-            fields.get('Cost', ''),                                          # Cost
-            fields.get('Date Completed', ''),                                # Date Completed
-            fields.get('Delivery Method', ''),                               # Delivery Method
-            fields.get('Square Feet', ''),                                   # Square Feet
-            fields.get('LevelsStories 1', ''),                               # Levels/Stories
-            fields.get('Name of Firm', ''),                                  # Name of Firm
-            fields.get('Contact Name', ''),                                  # Contact Name
-            fields.get('Title', ''),                                         # Title
-            fields.get('Phone 1', ''),                                       # Phone
-            fields.get('Email', ''),                                         # Email
-            fields.get('Owner', ''),                                         # Owner
-            fields.get('Owners RepProject Manager', ''),                     # Owner's Rep/Project Manager
-            fields.get('Design Team Firm PrincipalinCharge or Proj Mngr', ''),  # Design Team Firm
-            fields.get('Architect', ''),                                     # Architect
-            fields.get('Civil', ''),                                         # Civil
-            fields.get('Electrical', ''),                                    # Electrical
-            fields.get('Mechanical', ''),                                    # Mechanical
-            fields.get('Structural', ''),                                    # Structural
-            fields.get('Geotech', ''),                                       # Geotech
-            fields.get('Interior Design', ''),                               # Interior Design
-            fields.get('Furniture', ''),                                     # Furniture
-            fields.get('Landscape Architect', ''),                           # Landscape Architect
-            fields.get('Construction Team Firm Project Manager', ''),        # Construction Team Firm
-            fields.get('General Contractor', ''),                            # General Contractor
-            fields.get('Plumbing', ''),                                      # Plumbing
-            fields.get('HVAC', ''),                                          # HVAC
-            fields.get('Electrical_2', ''),                                  # Electrical_2
-            fields.get('Concrete', ''),                                      # Concrete
-            fields.get('Steel Fabrication', ''),                             # Steel Fabrication
-            fields.get('Steel Erection', ''),                                # Steel Erection
-            fields.get('GlassCurtain Wall', ''),                             # Glass/Curtain Wall
-            fields.get('Masonry', ''),                                       # Masonry
-            fields.get('DrywallAcoustics', ''),                              # Drywall/Acoustics
-            fields.get('Painting', ''),                                      # Painting
-            fields.get('TileStone', ''),                                     # Tile/Stone
-            fields.get('Carpentry', ''),                                     # Carpentry
-            fields.get('Flooring', ''),                                      # Flooring
-            fields.get('Roofing', ''),                                       # Roofing
-            fields.get('Waterproofing', ''),                                 # Waterproofing
-            fields.get('Excavation', ''),                                    # Excavation
-            fields.get('Demolition', ''),                                    # Demolition
-            fields.get('Precast', ''),                                       # Precast
-            fields.get('Landscaping 1', ''),                                 # Landscaping
-            fields.get('Project Overview', ''),                              # Project Overview
-            fields.get('Innovation in Design and Construction', ''),         # Innovation
-            fields.get('Aesthetics/Design Elements', ''),                    # Aesthetics/Design Elements
-            fields.get('Safety, Quality, Craftsmanship', ''),                # Safety, Quality, Craftsmanship
-            fields.get('Contribution to the Industry and Community', ''),    # Contribution to Industry
-            fields.get('Overcoming Unique Challenges/Obstacles', ''),        # Overcoming Challenges
-            # NEW FIELDS for Phase 1: Awards ID System
-            awards_id,                                                       # Awards ID (AW-YYYY-NNN)
-            'pending',                                                       # Status (pending/winner/not_selected)
-            '',                                                              # Winner Category (empty initially)
-            '',                                                              # Winner Notes (empty initially)
-            contact['submitter'],                                            # Submitter Email (web form)
-            contact['invoice'],                                              # Invoice Email (web form)
-        ]
+        # The row, keyed by the sheet's headings. It is written under those
+        # headings wherever they are (see append_row_by_header), so the sheet's
+        # columns can be inserted, moved or hidden without misplacing values.
+        row = {
+            "Submission Timestamp":                             datetime.now().isoformat(),
+            "Submission ID":                                    submission_id,
+            "PDF Link":                                         file_link,
+            "Project Folder":                                   f"https://drive.google.com/drive/folders/{project_folder_id}",
+            "Official Name":                                    fields.get('Official Name', ''),
+            "Location":                                         fields.get('Location', ''),
+            "Project Category or Categories for Consideration": extract_project_categories(fields),
+            "Cost":                                             fields.get('Cost', ''),
+            "Date Completed":                                   fields.get('Date Completed', ''),
+            "Delivery Method":                                  fields.get('Delivery Method', ''),
+            "Square Feet":                                      fields.get('Square Feet', ''),
+            "LevelsStories 1":                                  fields.get('LevelsStories 1', ''),
+            "Name of Firm":                                     fields.get('Name of Firm', ''),
+            "Contact Name":                                     fields.get('Contact Name', ''),
+            "Title":                                            fields.get('Title', ''),
+            "Phone 1":                                          fields.get('Phone 1', ''),
+            "Email":                                            fields.get('Email', ''),
+            "Owner":                                            fields.get('Owner', ''),
+            "Owners RepProject Manager":                        fields.get('Owners RepProject Manager', ''),
+            "Design Team Firm PrincipalinCharge or Proj Mngr":  fields.get('Design Team Firm PrincipalinCharge or Proj Mngr', ''),
+            "Architect":                                        fields.get('Architect', ''),
+            "Civil":                                            fields.get('Civil', ''),
+            "Electrical":                                       fields.get('Electrical', ''),
+            "Mechanical":                                       fields.get('Mechanical', ''),
+            "Structural":                                       fields.get('Structural', ''),
+            "Geotech":                                          fields.get('Geotech', ''),
+            "Interior Design":                                  fields.get('Interior Design', ''),
+            "Furniture":                                        fields.get('Furniture', ''),
+            "Landscape Architect":                              fields.get('Landscape Architect', ''),
+            "Construction Team Firm Project Manager":           fields.get('Construction Team Firm Project Manager', ''),
+            "General Contractor":                               fields.get('General Contractor', ''),
+            "Plumbing":                                         fields.get('Plumbing', ''),
+            "HVAC":                                             fields.get('HVAC', ''),
+            "Electrical_2":                                     fields.get('Electrical_2', ''),
+            "Concrete":                                         fields.get('Concrete', ''),
+            "Steel Fabrication":                                fields.get('Steel Fabrication', ''),
+            "Steel Erection":                                   fields.get('Steel Erection', ''),
+            "GlassCurtain Wall":                                fields.get('GlassCurtain Wall', ''),
+            "Masonry":                                          fields.get('Masonry', ''),
+            "DrywallAcoustics":                                 fields.get('DrywallAcoustics', ''),
+            "Painting":                                         fields.get('Painting', ''),
+            "TileStone":                                        fields.get('TileStone', ''),
+            "Carpentry":                                        fields.get('Carpentry', ''),
+            "Flooring":                                         fields.get('Flooring', ''),
+            "Roofing":                                          fields.get('Roofing', ''),
+            "Waterproofing":                                    fields.get('Waterproofing', ''),
+            "Excavation":                                       fields.get('Excavation', ''),
+            "Demolition":                                       fields.get('Demolition', ''),
+            "Precast":                                          fields.get('Precast', ''),
+            "Landscaping 1":                                    fields.get('Landscaping 1', ''),
+            "Project Overview":                                 fields.get('Project Overview', ''),
+            "Innovation in Design and Construction":            fields.get('Innovation in Design and Construction', ''),
+            "Aesthetics/Design Elements":                       fields.get('Aesthetics/Design Elements', ''),
+            "Safety, Quality, Craftsmanship":                   fields.get('Safety, Quality, Craftsmanship', ''),
+            "Contribution to the Industry and Community":       fields.get('Contribution to the Industry and Community', ''),
+            "Overcoming Unique Challenges/Obstacles":           fields.get('Overcoming Unique Challenges/Obstacles', ''),
+            "Awards ID":                                        awards_id,
+            "Status":                                           'pending',
+            "Winner Category":                                  '',
+            "Winner Notes":                                     '',
+            "Submitter Email":                                  contact['submitter'],
+            "Invoice Email":                                    contact['invoice'],
+            "Award Year":                                       year,
+        }
 
-        ensure_contact_headers(sheets_service, sheet_id, len(row_data) - len(CONTACT_HEADERS))
-        
         # Append to master sheet
-        append_to_sheet(sheets_service, sheet_id, row_data)
+        append_row_by_header(sheets_service, sheet_id, row)
         
         # Confirmation goes to whoever submitted (the web form's address),
         # copying the project contact from the PDF when that's someone else.

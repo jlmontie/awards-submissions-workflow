@@ -113,10 +113,16 @@ def submission_ids_in_sheet(pdf_processor) -> set:
     """
     sheets = pdf_processor.get_sheets_service()
     sheet_id = pdf_processor.get_secret(pdf_processor.AWARDS_SHEET_ID_SECRET)
+    # Found by heading: the client may insert or move columns.
+    column = pdf_processor.find_column(
+        pdf_processor.read_sheet_headers(sheets, sheet_id), 'Submission ID')
+    if column is None:
+        raise SystemExit("No 'Submission ID' heading in Sheet1; refusing to guess which rows exist.")
+    letter = pdf_processor._column_letter(column)
     result = sheets.spreadsheets().values().get(
-        spreadsheetId=sheet_id, range='Sheet1!B:B',
+        spreadsheetId=sheet_id, range=f'Sheet1!{letter}:{letter}',
     ).execute()
-    return {row[0].strip() for row in result.get('values', []) if row and row[0].strip()}
+    return {row[0].strip() for row in result.get('values', [])[1:] if row and row[0].strip()}
 
 
 def find_stranded(storage_client, bucket_name: str, known_ids: set, since=None):
