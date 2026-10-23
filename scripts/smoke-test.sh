@@ -35,16 +35,29 @@ check() {
 }
 
 upload_url() {
-  local type="$1" filename="$2" content_type="$3"
-  check "upload URL for $type" 200 \
+  local type="$1" filename="$2" content_type="$3" expected="$4"
+  check "upload URL for $type" "$expected" \
     -X POST "$BASE_URL/api/awards/get-upload-url" \
     -H 'Content-Type: application/json' \
-    -d "{\"filename\":\"$filename\",\"contentType\":\"$content_type\",\"size\":1024,\"submissionId\":\"$SUBMISSION_ID\",\"year\":\"smoke\",\"type\":\"$type\"}"
+    -d "{\"filename\":\"$filename\",\"contentType\":\"$content_type\",\"size\":1024,\"submissionId\":\"$SUBMISSION_ID\",\"type\":\"$type\"}"
 }
 
 check "awards page" 200 "$BASE_URL/awards"
-upload_url pdf smoke-test.pdf application/pdf
-upload_url photos smoke-test.jpg image/jpeg
+check "awards status" 200 "$BASE_URL/api/awards/status"
+
+# Upload URLs are refused on purpose while no award year is open. Between
+# competitions, check that the refusal is the clean 403 the form expects;
+# signing (and the bucket permission behind it) is only exercised while a
+# year is open.
+status=$(curl -sS --max-time 30 "$BASE_URL/api/awards/status" || true)
+if [[ "$status" == *'"accepting":true'* ]]; then
+  expected=200
+else
+  expected=403
+  echo "note: submissions are closed, so upload URLs should be refused ($status)"
+fi
+upload_url pdf smoke-test.pdf application/pdf "$expected"
+upload_url photos smoke-test.jpg image/jpeg "$expected"
 
 if (( failures > 0 )); then
   echo "$failures smoke check(s) failed"

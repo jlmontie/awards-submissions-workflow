@@ -6,6 +6,8 @@ import {
   MAX_PHOTO_SIZE,
   MAX_PHOTO_SIZE_MB,
 } from '@/lib/awards/upload-limits';
+import { getSheetsClient } from '@/lib/google-sheets';
+import { currentSubmissionWindow } from '@/lib/awards/award-years-store';
 
 // Force this route to be dynamic (not pre-rendered at build time)
 export const dynamic = 'force-dynamic';
@@ -71,13 +73,14 @@ export async function POST(request: NextRequest) {
       contentType,
       size,
       submissionId,
-      year,
       type, // 'pdf' or 'photos'
       recaptchaToken,
     } = body;
+    // `body.year` is ignored. It came from the submitter's clock; the year is
+    // now the open award year. Browsers holding the old page still send it.
 
     // Validate required fields
-    if (!filename || !contentType || !submissionId || !year || !type || typeof size !== 'number') {
+    if (!filename || !contentType || !submissionId || !type || typeof size !== 'number') {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -128,6 +131,25 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    // The award year decides both whether entries are taken and where they
+    // are filed. The path's year flows to the Drive folder and the Awards ID.
+    // Uploads keep working for a short grace period after a close so an
+    // entry already underway can finish; see UPLOAD_GRACE_MS.
+    const window = await currentSubmissionWindow(() => getSheetsClient(true), { forUploads: true });
+    if (!window.accepting) {
+      return NextResponse.json(
+        {
+          error:
+            window.reason === 'not_yet_open'
+              ? `Submissions for ${window.year} are not open yet.`
+              : 'Submissions are closed.',
+          closed: true,
+        },
+        { status: 403 }
+      );
+    }
+    const year = window.year;
 
     // Sanitize filename
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');

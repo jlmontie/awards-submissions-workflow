@@ -20,6 +20,11 @@ function SubmissionsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const filter = searchParams.get('filter') || 'all';
+  // '' until the award years load; 'all' for every year.
+  const yearParam = searchParams.get('year');
+  const [defaultYear, setDefaultYear] = useState('');
+  const [years, setYears] = useState<string[]>([]);
+  const year = yearParam || defaultYear;
 
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,13 +33,41 @@ function SubmissionsContent() {
   const [exportError, setExportError] = useState('');
 
   useEffect(() => {
-    loadSubmissions();
-  }, [filter]);
+    loadYears();
+  }, []);
+
+  useEffect(() => {
+    if (year) loadSubmissions();
+  }, [filter, year]);
+
+  // Defaults to the year taking entries, else the latest one. Before any
+  // award year exists, every submission is shown.
+  async function loadYears() {
+    try {
+      const res = await fetch('/api/awards/admin/years');
+      const data = await res.json();
+      const list: string[] = (data.years || []).map((y: { year: string }) => y.year);
+      setYears(list);
+      setDefaultYear(data.window?.accepting ? data.window.year : list[0] || 'all');
+    } catch (error) {
+      console.error('Error loading award years:', error);
+      setDefaultYear('all');
+    }
+  }
+
+  function yearQuery() {
+    return year && year !== 'all' ? `&year=${year}` : '';
+  }
+
+  function navigate(next: { filter?: string; year?: string }) {
+    const params = new URLSearchParams({ filter: next.filter ?? filter, year: next.year ?? year });
+    router.push(`/admin/awards?${params}`);
+  }
 
   async function loadSubmissions() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/awards/admin/submissions?filter=${filter}`);
+      const res = await fetch(`/api/awards/admin/submissions?filter=${filter}${yearQuery()}`);
       const data = await res.json();
       setSubmissions(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -48,7 +81,7 @@ function SubmissionsContent() {
     setExporting(true);
     setExportError('');
     try {
-      const res = await fetch('/api/awards/admin/export');
+      const res = await fetch(`/api/awards/admin/export?${yearQuery().slice(1)}`);
       if (!res.ok) throw new Error('Export failed. Please try again.');
 
       const blob = await res.blob();
@@ -102,7 +135,8 @@ function SubmissionsContent() {
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-heading font-semibold text-navy-500">Submissions</h1>
           <p className="mt-2 text-sm text-gray-700">
-            All awards submissions for review and management
+            {year && year !== 'all' ? `${year} awards submissions` : 'All awards submissions'} for
+            review and management
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex sm:flex-none sm:gap-3">
@@ -114,6 +148,12 @@ function SubmissionsContent() {
           >
             {exporting ? 'Exporting…' : 'Export by Category (.xlsx)'}
           </button>
+          <Link
+            href="/admin/awards/years"
+            className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          >
+            Award Years
+          </Link>
           <Link
             href="/awards"
             target="_blank"
@@ -133,9 +173,22 @@ function SubmissionsContent() {
 
       {/* Filters */}
       <div className="mt-4 flex flex-col sm:flex-row gap-4">
+        <select
+          aria-label="Award year"
+          value={year}
+          onChange={(e) => navigate({ year: e.target.value })}
+          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm"
+        >
+          {(year && year !== 'all' && !years.includes(year) ? [year, ...years] : years).map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+          <option value="all">All years</option>
+        </select>
         <div className="flex rounded-md shadow-sm">
           <button
-            onClick={() => router.push('/admin/awards?filter=all')}
+            onClick={() => navigate({ filter: 'all' })}
             className={`relative inline-flex items-center rounded-l-md px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'all'
                 ? 'bg-navy-500 text-white'
@@ -145,7 +198,7 @@ function SubmissionsContent() {
             All ({submissions.length})
           </button>
           <button
-            onClick={() => router.push('/admin/awards?filter=pending')}
+            onClick={() => navigate({ filter: 'pending' })}
             className={`relative -ml-px inline-flex items-center px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'pending'
                 ? 'bg-navy-500 text-white'
@@ -155,7 +208,7 @@ function SubmissionsContent() {
             Pending
           </button>
           <button
-            onClick={() => router.push('/admin/awards?filter=winners')}
+            onClick={() => navigate({ filter: 'winners' })}
             className={`relative -ml-px inline-flex items-center rounded-r-md px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
               filter === 'winners'
                 ? 'bg-navy-500 text-white'
