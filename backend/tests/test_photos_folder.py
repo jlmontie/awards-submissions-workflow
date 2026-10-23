@@ -31,8 +31,8 @@ def make_event(path: str, age: timedelta) -> CloudEvent:
 
 
 def test_pdf_processor_creates_photos_folder():
-    folders = {'2026': 'year-1', 'Lehi Civic Center': 'project-1', 'Photos': 'photos-1'}
-    find_or_create = mock.Mock(side_effect=lambda svc, parent, name, *a: folders[name])
+    folders = {'2026': 'year-1', 'Photos': 'photos-1'}
+    find_or_create = mock.Mock(side_effect=lambda svc, parent, name: folders[name])
     event = make_event('submissions/2026/abc-123/pdf/form.pdf', timedelta(0))
 
     with mock.patch.object(pdf_processor, 'storage_client') as storage, \
@@ -42,7 +42,7 @@ def test_pdf_processor_creates_photos_folder():
          mock.patch.object(pdf_processor, 'get_sheets_service'), \
          mock.patch.object(pdf_processor, 'submission_already_recorded', return_value=False), \
          mock.patch.object(pdf_processor, 'get_drive_service', return_value='drive'), \
-         mock.patch.object(pdf_processor, 'find_or_create_folder', find_or_create), \
+         mock.patch.object(pdf_processor, 'find_or_create_folder', find_or_create),          mock.patch.object(pdf_processor, 'find_or_create_project_folder', return_value='project-1'),          mock.patch.object(pdf_processor, 'generate_awards_id', return_value='AW-2026-001'), \
          mock.patch.object(pdf_processor, 'upload_to_drive', side_effect=Stop):
         storage.bucket.return_value.blob.return_value.size = 1024
         with pytest.raises(Stop):

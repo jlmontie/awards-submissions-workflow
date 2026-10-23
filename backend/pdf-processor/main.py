@@ -471,27 +471,22 @@ def drive_display_copy(pdf_bytes: bytes) -> bytes:
         return pdf_bytes
 
 
-def find_or_create_folder(service, parent_id: str, folder_name: str,
-                          submission_id: Optional[str] = None) -> str:
+def find_or_create_folder(service, parent_id: str, folder_name: str) -> str:
     """
-    Find existing folder or create new one in Google Drive.
-    With impersonation, folders will be owned by the impersonated user.
+    Find a folder by name under a parent, or create it.
+
+    For shared folders only: the year folder, and a project folder's Photos
+    subfolder. A submission's own folder is found by its id, never by name;
+    see find_or_create_project_folder.
 
     Args:
         service: Authenticated Drive service
         parent_id: Parent folder ID
         folder_name: Name for the folder
-        submission_id: Stamped onto the folder as appProperties.submissionId
-            when creating a project folder. This is the only durable link
-            between a folder and the submission that produced it — the folder
-            is named after the project, which the photo processor never sees,
-            so without the stamp it cannot tell one project's folder from
-            another's. Omitted for the year folder, which is shared.
 
     Returns:
         ID of found or created folder
     """
-    # First, try to find existing folder
     query = (
         f"name={drive_query_literal(folder_name)} "
         "and mimeType='application/vnd.google-apps.folder' "
@@ -511,28 +506,13 @@ def find_or_create_folder(service, parent_id: str, folder_name: str,
     if files:
         folder_id = files[0]['id']
         logger.info(f"Found existing folder: {folder_name} (ID: {folder_id})")
-        # A folder created before the stamp existed, or by an earlier
-        # submission with the same project name, still needs the id so the
-        # photo processor can find it.
-        if submission_id:
-            try:
-                service.files().update(
-                    fileId=folder_id,
-                    body={'appProperties': {'submissionId': submission_id}},
-                    supportsAllDrives=True,
-                ).execute()
-            except Exception as e:
-                logger.warning(f"Could not stamp submissionId on {folder_id}: {e}")
         return folder_id
 
-    # Folder doesn't exist, create it
     file_metadata = {
         'name': folder_name,
         'mimeType': 'application/vnd.google-apps.folder',
         'parents': [parent_id]
     }
-    if submission_id:
-        file_metadata['appProperties'] = {'submissionId': submission_id}
 
     try:
         folder = service.files().create(
@@ -546,6 +526,63 @@ def find_or_create_folder(service, parent_id: str, folder_name: str,
     except Exception as e:
         logger.error(f"Error creating folder '{folder_name}': {e}")
         raise
+
+
+def project_folder_name(project_name: str, awards_id: str) -> str:
+    """Project first, so Drive search and sorting group a project's entries;
+    the Awards ID makes it unique and matches the Sheet row."""
+    return f"{project_name} — {awards_id}"
+
+
+def find_or_create_project_folder(service, year_folder_id: str, submission_id: str,
+                                  folder_name: str) -> str:
+    """
+    The submission's own folder, found by the submissionId stamped on it.
+
+    The stamp is the folder's identity; the name is only a label. This used
+    to find the folder by project name and re-stamp it, so two entries with
+    the same project name shared one folder: in 2026 "Nusano" was entered by
+    two firms, and the second entry's stamp replaced the first's. Matching
+    on the stamp also makes retries land in the same folder, renaming it if
+    the label changed (a retry can be issued a different Awards ID).
+
+    The photo processor finds the folder by the same stamp.
+    """
+    query = (
+        "mimeType='application/vnd.google-apps.folder' "
+        f"and {drive_query_literal(year_folder_id)} in parents and trashed=false "
+        "and appProperties has { key='submissionId' and value="
+        f"{drive_query_literal(submission_id)} }}"
+    )
+    files = service.files().list(
+        q=query,
+        spaces='drive',
+        fields='files(id, name)',
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute().get('files', [])
+
+    if files:
+        folder = files[0]
+        if folder['name'] != folder_name:
+            service.files().update(
+                fileId=folder['id'], body={'name': folder_name}, supportsAllDrives=True
+            ).execute()
+            logger.info(f"Renamed folder {folder['id']} to {folder_name}")
+        return folder['id']
+
+    folder = service.files().create(
+        body={
+            'name': folder_name,
+            'mimeType': 'application/vnd.google-apps.folder',
+            'parents': [year_folder_id],
+            'appProperties': {'submissionId': submission_id},
+        },
+        fields='id',
+        supportsAllDrives=True
+    ).execute()
+    logger.info(f"Created folder: {folder_name} (ID: {folder.get('id')})")
+    return folder.get('id')
 
 
 def upload_to_drive(service, file_bytes: bytes, filename: str,
@@ -908,11 +945,18 @@ def process_pdf(cloud_event):
         # Initialize Drive service
         drive_service = get_drive_service()
         
+        # The Awards ID comes first because it is part of the folder's name.
+        # IDs are the highest in the sheet plus one, so two submissions
+        # processed at once could be given the same one; the function runs
+        # one instance at a time (terraform/functions.tf) to rule that out.
+        awards_id = generate_awards_id(sheets_service, sheet_id, year)
+        logger.info(f"Generated Awards ID: {awards_id} for submission {submission_id}")
+
         # Create folder structure: Root > Year > Project
-        # With impersonation, folders will be owned by the impersonated user
         year_folder_id = find_or_create_folder(drive_service, drive_root_id, year)
-        project_folder_id = find_or_create_folder(
-            drive_service, year_folder_id, project_name, submission_id
+        project_folder_id = find_or_create_project_folder(
+            drive_service, year_folder_id, submission_id,
+            project_folder_name(project_name, awards_id)
         )
 
         # The Photos subfolder is made here, not by the photo processor. Its
@@ -930,12 +974,6 @@ def process_pdf(cloud_event):
             filename,
             project_folder_id
         )
-        
-        # sheet_id / sheets_service were resolved above for the duplicate check.
-
-        # Generate unique Awards ID for this submission
-        awards_id = generate_awards_id(sheets_service, sheet_id, year)
-        logger.info(f"Generated Awards ID: {awards_id} for submission {submission_id}")
         
         # Build row data matching the exact column order from the Sheet
         row_data = [

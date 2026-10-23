@@ -103,7 +103,7 @@ def test_process_pdf_uploads_the_display_copy_and_reads_the_original():
          mock.patch.object(pdf_processor, 'get_sheets_service'), \
          mock.patch.object(pdf_processor, 'submission_already_recorded', return_value=False), \
          mock.patch.object(pdf_processor, 'get_drive_service', return_value='drive'), \
-         mock.patch.object(pdf_processor, 'find_or_create_folder', return_value='folder-1'), \
+         mock.patch.object(pdf_processor, 'find_or_create_folder', return_value='folder-1'),          mock.patch.object(pdf_processor, 'find_or_create_project_folder', return_value='folder-2'),          mock.patch.object(pdf_processor, 'generate_awards_id', return_value='AW-2026-001'), \
          mock.patch.object(pdf_processor, 'upload_to_drive', side_effect=Stop) as upload:
         blob = storage.bucket.return_value.blob.return_value
         blob.size = len(original)
