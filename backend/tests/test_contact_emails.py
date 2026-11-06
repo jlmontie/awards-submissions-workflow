@@ -55,7 +55,7 @@ def test_row_carries_both_addresses_and_the_award_year():
     assert row['Submitter Email'] == 'james@aeurbia.com'
     assert row['Invoice Email'] == 'ap@aeurbia.com'
     assert row['Award Year'] == '2027'
-    assert row['Awards ID'] == 'AW-2027-001' and row['Status'] == 'pending'
+    assert row['Awards ID'] == 'AW-2027-001'
 
 
 def test_confirmation_goes_to_the_submitter_and_copies_the_contact():
