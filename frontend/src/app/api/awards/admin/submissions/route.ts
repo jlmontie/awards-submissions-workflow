@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
-import { filterValuesByYear, isWinner } from '@/lib/awards/sheet-rows';
+import { filterValuesByYear } from '@/lib/awards/sheet-rows';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -30,9 +30,7 @@ async function getSheetData() {
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const filter = searchParams.get('filter') || 'all';
-    const year = searchParams.get('year');
+    const year = request.nextUrl.searchParams.get('year');
 
     const data = filterValuesByYear(await getSheetData(), year);
 
@@ -65,7 +63,6 @@ export async function GET(request: NextRequest) {
         pdfLink: row[pdfLinkIndex] || '',
         folderLink: row[folderLinkIndex] || '',
       }))
-      .filter((s) => filter !== 'winners' || isWinner(s.winnerCategory))
       .sort((a, b) => {
         // Sort by Awards ID descending (newest first)
         return b.awardsId.localeCompare(a.awardsId);
