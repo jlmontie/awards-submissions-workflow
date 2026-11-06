@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { isWinner } from '@/lib/awards/sheet-rows';
 
 interface Submission {
   awardsId: string;
@@ -30,6 +31,8 @@ function SubmissionsContent() {
   const [search, setSearch] = useState('');
   const [exporting, setExporting] = useState<'category' | 'team' | null>(null);
   const [exportError, setExportError] = useState('');
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadYears();
@@ -37,7 +40,23 @@ function SubmissionsContent() {
 
   useEffect(() => {
     if (year) loadSubmissions();
-  }, [filter, year]);
+  }, [year]);
+
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const closeOnOutsideClick = (e: MouseEvent) => {
+      if (!exportMenu.current?.contains(e.target as Node)) setExportMenuOpen(false);
+    };
+    const closeOnEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExportMenuOpen(false);
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('mousedown', closeOnOutsideClick);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [exportMenuOpen]);
 
   // Defaults to the year taking entries, else the latest one. Before any
   // award year exists, every submission is shown.
@@ -66,7 +85,7 @@ function SubmissionsContent() {
   async function loadSubmissions() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/awards/admin/submissions?filter=${filter}${yearQuery()}`);
+      const res = await fetch(`/api/awards/admin/submissions?${yearQuery().slice(1)}`);
       const data = await res.json();
       setSubmissions(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -77,6 +96,7 @@ function SubmissionsContent() {
   }
 
   async function download(kind: 'category' | 'team', path: string, fallbackName: string) {
+    setExportMenuOpen(false);
     setExporting(kind);
     setExportError('');
     try {
@@ -102,7 +122,9 @@ function SubmissionsContent() {
     }
   }
 
-  const filteredSubmissions = submissions.filter((s) => {
+  const winners = submissions.filter((s) => isWinner(s.winnerCategory));
+
+  const filteredSubmissions = (filter === 'winners' ? winners : submissions).filter((s) => {
     if (!search) return true;
     const searchLower = search.toLowerCase();
     return (
@@ -123,26 +145,50 @@ function SubmissionsContent() {
           </p>
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex sm:flex-none sm:gap-3">
-          <button
-            onClick={() =>
-              download('category', '/api/awards/admin/export', 'awards-submissions-by-category.xlsx')
-            }
-            disabled={exporting !== null}
-            title="One row per project category, as an Excel table"
-            className="inline-flex items-center rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
-          >
-            {exporting === 'category' ? 'Exporting…' : 'Export by Category (.xlsx)'}
-          </button>
-          <button
-            onClick={() =>
-              download('team', '/api/awards/admin/project-team-export', 'awards-winners-project-team.xlsx')
-            }
-            disabled={exporting !== null}
-            title="Winners' project teams, for the awards video and yearbook"
-            className="inline-flex items-center rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
-          >
-            {exporting === 'team' ? 'Exporting…' : 'Export Winner Project Teams (.xlsx)'}
-          </button>
+          <div ref={exportMenu} className="relative">
+            <button
+              onClick={() => setExportMenuOpen((open) => !open)}
+              disabled={exporting !== null}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              className="inline-flex items-center gap-1 rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
+            >
+              {exporting ? 'Exporting…' : 'Export'}
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {exportMenuOpen && (
+              <div
+                role="menu"
+                className="absolute left-0 sm:left-auto sm:right-0 z-10 mt-2 w-72 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5"
+              >
+                <button
+                  role="menuitem"
+                  onClick={() =>
+                    download('category', '/api/awards/admin/export', 'awards-submissions-by-category.xlsx')
+                  }
+                  className="block w-full px-4 py-2 text-left hover:bg-gray-50"
+                >
+                  <span className="block text-sm font-semibold text-gray-900">Submissions by Category</span>
+                  <span className="block text-xs text-gray-500">One row per project category (.xlsx)</span>
+                </button>
+                <button
+                  role="menuitem"
+                  onClick={() =>
+                    download('team', '/api/awards/admin/project-team-export', 'awards-winners-project-team.xlsx')
+                  }
+                  disabled={winners.length === 0}
+                  className="block w-full px-4 py-2 text-left hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white"
+                >
+                  <span className="block text-sm font-semibold text-gray-900">Winner Project Teams</span>
+                  <span className="block text-xs text-gray-500">
+                    Available once winners are entered in the sheet’s Winner Category column (.xlsx)
+                  </span>
+                </button>
+              </div>
+            )}
+          </div>
           <Link
             href="/admin/awards/years"
             className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
@@ -200,7 +246,7 @@ function SubmissionsContent() {
                 : 'bg-white text-gray-900 hover:bg-gray-50'
             }`}
           >
-            Winners
+            Winners ({winners.length})
           </button>
         </div>
 
