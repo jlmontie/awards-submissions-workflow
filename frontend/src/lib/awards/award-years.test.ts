@@ -38,7 +38,13 @@ describe('parseAwardYears', () => {
       ])
     ).toEqual([
       year({ year: '2026', status: 'open', opens: '2026-09-01', closes: '2026-11-15' }),
-      year({ year: '2027', status: 'draft' }),
+      year({ year: '2027', status: 'closed' }),
+    ]);
+  });
+
+  it('reads a retired draft row as closed', () => {
+    expect(parseAwardYears([['Year', 'Status'], ['2027', 'draft']])).toEqual([
+      year({ year: '2027', status: 'closed' }),
     ]);
   });
 });
@@ -125,21 +131,21 @@ describe('submissionWindow', () => {
     expect(submissionWindow(years, startOfDay('2026-09-01'))).toMatchObject({ accepting: true });
   });
 
-  it('never takes entries for a draft', () => {
-    expect(submissionWindow([year({ status: 'draft' })], Date.now(), { forUploads: true })).toMatchObject({
+  it('never takes entries for a year that has not been opened', () => {
+    expect(submissionWindow([year({ status: 'closed' })], Date.now(), { forUploads: true })).toMatchObject({
       accepting: false,
     });
   });
 
-  it('files under the open year even when a later year exists as a draft', () => {
-    const years = [year({ year: '2027', status: 'draft' }), year({ year: '2026' })];
+  it('files under the open year even when a later year exists, not yet opened', () => {
+    const years = [year({ year: '2027', status: 'closed' }), year({ year: '2026' })];
     expect(submissionWindow(years, Date.now())).toEqual({ accepting: true, year: '2026' });
   });
 });
 
 describe('otherOpenYear', () => {
   it('finds a different open year', () => {
-    const years = [year({ year: '2026' }), year({ year: '2027', status: 'draft' })];
+    const years = [year({ year: '2026' }), year({ year: '2027', status: 'closed' })];
     expect(otherOpenYear(years, '2027')).toBe('2026');
     expect(otherOpenYear(years, '2026')).toBeNull();
   });

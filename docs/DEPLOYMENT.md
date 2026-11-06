@@ -136,15 +136,17 @@ account above.
 ## Award Years
 
 Each year's competition is a row in the `Award Years` tab: its status
-(draft, open or closed) and optional opening and closing dates in Mountain
+(open or closed) and optional opening and closing dates in Mountain
 time. Entries are accepted through the end of the closing day.
 
 - The public form takes entries only while a year is open, and files them
   under that year: the GCS path, the Drive folder and the `AW-YYYY-NNN` id.
   The year used to come from the submitter's browser clock.
-- Until a year has been opened or closed, the form keeps its old behavior:
-  always open, filed under the current calendar year. A year added as a draft
-  changes nothing.
+- Until a year has been added, the form keeps its old behavior: always open,
+  filed under the current calendar year. Once any year exists the table
+  decides.
+- A new year starts closed. It takes no entries until someone clicks Open,
+  even if its opening date has passed. Closing it undoes that.
 - Uploads keep working for 30 minutes after a close, so an entry already
   underway can finish. The public page shows "closed" immediately.
 - A change reaches the public form within a minute (each instance caches the
@@ -152,8 +154,8 @@ time. Entries are accepted through the end of the closing day.
 - If Sheets can't be read, the form uses the last state it saw, or stays open
   under the calendar year. A Sheets outage never turns entries away.
 
-Each year: add the year as a draft, set its dates, and open it when entries
-should start. Only one year can be open at a time.
+Each year: add the year, set its dates, and open it when entries should
+start. Only one year can be open at a time.
 
 ## Submitter and Invoice Emails
 

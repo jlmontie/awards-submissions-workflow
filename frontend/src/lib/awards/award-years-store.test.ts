@@ -78,8 +78,13 @@ describe('readAwardYears', () => {
     expect(await readAwardYears(fakeSheets(null).client)).toEqual({ configured: false, years: [] });
   });
 
-  it('stays unconfigured while every year is a draft', async () => {
-    const { client } = fakeSheets([HEADER, ['2027', 'draft']]);
+  it('is configured as soon as a year exists, even one never opened', async () => {
+    const { client } = fakeSheets([HEADER, ['2027', 'closed']]);
+    expect((await readAwardYears(client)).configured).toBe(true);
+  });
+
+  it('is not configured with no years in the tab', async () => {
+    const { client } = fakeSheets([HEADER]);
     expect((await readAwardYears(client)).configured).toBe(false);
   });
 
@@ -93,11 +98,21 @@ describe('readAwardYears', () => {
 describe('currentSubmissionWindow', () => {
   const now = Date.parse('2026-10-14T18:00:00Z');
 
-  it('keeps the old behavior until a year is opened or closed', async () => {
-    const { client } = fakeSheets([HEADER, ['2027', 'draft']]);
+  it('keeps the old behavior until a year is added', async () => {
+    const { client } = fakeSheets([HEADER]);
     expect(await currentSubmissionWindow(async () => client, { now })).toEqual({
       accepting: true,
       year: '2026',
+    });
+  });
+
+  it('stays closed when the only year has never been opened', async () => {
+    const { client } = fakeSheets([HEADER, ['2027', 'closed']]);
+    expect(await currentSubmissionWindow(async () => client, { now })).toMatchObject({
+      accepting: false,
+    });
+    expect(await currentSubmissionWindow(async () => client, { now, forUploads: true })).toMatchObject({
+      accepting: false,
     });
   });
 
@@ -152,12 +167,12 @@ describe('createAwardYear', () => {
     });
     expect(sheets.tab()).toEqual([
       HEADER,
-      ['2027', 'draft', '', '', '', now.toISOString(), 'admin@x'],
+      ['2027', 'closed', '', '', '', now.toISOString(), 'admin@x'],
     ]);
   });
 
   it('rejects a duplicate year', async () => {
-    const { client } = fakeSheets([HEADER, ['2027', 'draft']]);
+    const { client } = fakeSheets([HEADER, ['2027', 'closed']]);
     await expect(createAwardYear(client, { year: '2027' }, 'a', now)).rejects.toMatchObject({ status: 409 });
   });
 
@@ -189,6 +204,21 @@ describe('updateAwardYear', () => {
     expect(sheets.tab()![2]).toEqual([
       '2026', 'closed', '2026-09-01', '', now.toISOString(), now.toISOString(), 'admin@x',
     ]);
+  });
+
+  it('gives a never-opened year no close time, so no upload grace, when its dates change', async () => {
+    const { client } = fakeSheets([HEADER, ['2027', 'closed']]);
+    expect(await updateAwardYear(client, '2027', { opens: '2027-03-01' }, 'a', now)).toMatchObject({
+      status: 'closed',
+      opens: '2027-03-01',
+      closedAt: '',
+    });
+  });
+
+  it('keeps the original close time when a closed year is saved again', async () => {
+    const closedAt = '2026-10-01T00:00:00Z';
+    const { client } = fakeSheets([HEADER, ['2026', 'closed', '', '', closedAt]]);
+    expect(await updateAwardYear(client, '2026', { closes: '2026-10-01' }, 'a', now)).toMatchObject({ closedAt });
   });
 
   it('clears the close time when reopened', async () => {

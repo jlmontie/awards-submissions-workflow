@@ -1,5 +1,6 @@
 import type { SheetsClient } from '@/lib/google-sheets';
 import {
+  AWARD_YEAR_STATUSES,
   AWARD_YEARS_HEADERS,
   AWARD_YEARS_TAB,
   AwardYear,
@@ -20,9 +21,9 @@ const SUBMISSIONS_TAB = 'Sheet1';
 
 export interface AwardYearsSnapshot {
   /**
-   * False until some year has been opened or closed. Until then the public
-   * form keeps its old behavior (open, calendar year), so setting up a year
-   * as a draft cannot close the form by accident.
+   * False until a year has been added. Until then the public form keeps its
+   * old behavior (open, calendar year). Once one exists the table decides,
+   * whether or not any year has ever been opened.
    */
   configured: boolean;
   years: AwardYear[];
@@ -50,7 +51,7 @@ export async function readAwardYears(
       requestOptions
     );
     const years = parseAwardYears((res.data.values as string[][]) || []);
-    return { configured: years.some((y) => y.status !== 'draft'), years };
+    return { configured: years.length > 0, years };
   } catch (err) {
     if (isMissingTab(err)) return { configured: false, years: [] };
     throw err;
@@ -130,7 +131,7 @@ export interface AwardYearInput {
 
 function validate(next: AwardYear, all: AwardYear[]) {
   if (!isValidYear(next.year)) throw new AwardYearError('Year must be four digits, e.g. 2027.');
-  if (!['draft', 'open', 'closed'].includes(next.status)) throw new AwardYearError('Unknown status.');
+  if (!AWARD_YEAR_STATUSES.includes(next.status)) throw new AwardYearError('Unknown status.');
   for (const [label, value] of [['Opens', next.opens], ['Closes', next.closes]] as const) {
     if (value && !isValidDate(value)) throw new AwardYearError(`${label} must be a date (YYYY-MM-DD).`);
   }
@@ -214,13 +215,14 @@ export async function createAwardYear(
   const year = String(input.year ?? '').trim();
   if (years.some((y) => y.year === year)) throw new AwardYearError(`${year} already exists.`, 409);
 
-  const status = input.status ?? 'draft';
+  // Closed until someone opens it by hand.
+  const status = input.status ?? 'closed';
   const next: AwardYear = {
     year,
     status,
     opens: input.opens ?? '',
     closes: input.closes ?? '',
-    closedAt: status === 'closed' ? now.toISOString() : '',
+    closedAt: '',
     updatedAt: now.toISOString(),
     updatedBy: by,
   };
@@ -257,13 +259,9 @@ export async function updateAwardYear(
     status,
     opens: patch.opens ?? current.opens,
     closes: patch.closes ?? current.closes,
-    // Record when a year is closed by hand; reopening clears it.
-    closedAt:
-      status === 'closed'
-        ? current.status === 'closed' && current.closedAt
-          ? current.closedAt
-          : now.toISOString()
-        : '',
+    // Stamped only on the move from open to closed, because the stamp starts
+    // the upload grace period: a year that was never open must not get one.
+    closedAt: status === 'open' ? '' : current.status === 'open' ? now.toISOString() : current.closedAt,
     updatedAt: now.toISOString(),
     updatedBy: by,
   };
