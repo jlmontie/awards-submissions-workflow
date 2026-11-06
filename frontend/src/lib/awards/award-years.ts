@@ -31,8 +31,8 @@ export const AWARDS_TIME_ZONE = 'America/Denver';
 // The public page shows "closed" from the moment it closes.
 export const UPLOAD_GRACE_MS = 30 * 60 * 1000;
 
-export type AwardYearStatus = 'draft' | 'open' | 'closed';
-export const AWARD_YEAR_STATUSES: AwardYearStatus[] = ['draft', 'open', 'closed'];
+export type AwardYearStatus = 'open' | 'closed';
+export const AWARD_YEAR_STATUSES: AwardYearStatus[] = ['open', 'closed'];
 
 export interface AwardYear {
   year: string;
@@ -41,7 +41,7 @@ export interface AwardYear {
   opens: string;
   /** YYYY-MM-DD, the last day entries are accepted; '' for "until closed by hand". */
   closes: string;
-  /** ISO timestamp of a manual close. */
+  /** ISO timestamp of a manual close; '' for a year that has never been open. */
   closedAt: string;
   updatedAt: string;
   updatedBy: string;
@@ -71,7 +71,7 @@ export function parseAwardYears(values: string[][]): AwardYear[] {
         year: cell(0),
         status: (AWARD_YEAR_STATUSES as string[]).includes(status)
           ? (status as AwardYearStatus)
-          : 'draft',
+          : 'closed',
         opens: cell(2),
         closes: cell(3),
         closedAt: cell(4),
@@ -133,7 +133,6 @@ export interface YearState {
 export function yearState(y: AwardYear, now: number): YearState {
   const closed = (at: number | null): YearState => ({ open: false, closedAtMs: at, notYetOpen: false });
 
-  if (y.status === 'draft') return closed(null);
   if (y.status === 'closed') {
     const at = Date.parse(y.closedAt);
     return closed(Number.isNaN(at) ? null : at);

@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 interface AwardYear {
   year: string;
-  status: 'draft' | 'open' | 'closed';
+  status: 'open' | 'closed';
   opens: string;
   closes: string;
   closedAt: string;
@@ -18,7 +18,6 @@ type Window =
   | { accepting: false; year: string | null; reason: 'closed' | 'not_yet_open' | 'none' };
 
 const STATUS_STYLES: Record<AwardYear['status'], string> = {
-  draft: 'bg-gray-100 text-gray-800',
   open: 'bg-green-100 text-green-800',
   closed: 'bg-yellow-100 text-yellow-800',
 };
@@ -34,7 +33,7 @@ function PublicStatus({ configured, window, years }: { configured: boolean; wind
   let text: string;
   if (!configured || !window) {
     text =
-      'No award year has been opened yet. Until one is, the public form stays open and files entries under the current calendar year.';
+      'No award year has been added yet. Until one is, the public form stays open and files entries under the current calendar year.';
   } else if (window.accepting) {
     const closes = years.find((y) => y.year === window.year)?.closes;
     text = `The public form is open, taking ${window.year} entries${closes ? ` through ${formatDate(closes)} (Mountain time)` : ' until closed here'}.`;
@@ -80,6 +79,12 @@ function YearRow({ y, onSaved }: { y: AwardYear; onSaved: () => void }) {
     }
   }
 
+  function openNow() {
+    if (window.confirm(`Open ${y.year}? The public form starts taking entries within a minute, or on its opening date if it has one.`)) {
+      save({ status: 'open' });
+    }
+  }
+
   return (
     <tr>
       <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-semibold text-gray-900">{y.year}</td>
@@ -106,7 +111,7 @@ function YearRow({ y, onSaved }: { y: AwardYear; onSaved: () => void }) {
             </button>
           )}
           {y.status !== 'open' ? (
-            <button onClick={() => save({ status: 'open' })} disabled={saving} className="rounded-md bg-white px-3 py-1 font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
+            <button onClick={openNow} disabled={saving} className="rounded-md bg-white px-3 py-1 font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50">
               Open
             </button>
           ) : (
@@ -138,8 +143,8 @@ function NewYearForm({ suggested, onCreated }: { suggested: string; onCreated: (
       const res = await fetch('/api/awards/admin/years', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Created as a draft: nothing changes for the public form until it is opened.
-        body: JSON.stringify({ year, opens, closes, status: 'draft' }),
+        // Created closed: it takes no entries until it is opened here.
+        body: JSON.stringify({ year, opens, closes }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Create failed');
@@ -157,7 +162,8 @@ function NewYearForm({ suggested, onCreated }: { suggested: string; onCreated: (
     <form onSubmit={create} className="mt-10 rounded-lg border border-gray-200 bg-white p-6">
       <h2 className="text-lg font-heading font-semibold text-navy-500">Add an award year</h2>
       <p className="mt-1 text-sm text-gray-600">
-        New years start as drafts. Open one when it should start taking entries; only one year can be open at a time.
+        New years start closed and take no entries until you click Open, even if an opening date has passed. After
+        that, the form waits for the opening date if there is one. Only one year can be open at a time.
       </p>
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
         <label className="text-sm text-gray-700">
