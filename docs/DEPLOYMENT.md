@@ -164,7 +164,7 @@ submitting, and who the entry fee is invoiced to. The upload route saves them
 to `submissions/<year>/<id>/meta/submission.json` before it hands out the
 PDF's upload URL, so the file is there when the PDF processor runs.
 
-- The processor writes them to Sheet1 under **Submitter Email** and
+- The processor writes them to the year's sheet under **Submitter Email** and
   **Invoice Email**.
 - The confirmation email goes to the submitter, copying the contact from the
   PDF if that's a different address.
@@ -173,19 +173,36 @@ PDF's upload URL, so the file is there when the PDF processor runs.
 
 ## The Submissions Sheet
 
-Every year shares one sheet, `Sheet1`. The processor writes each new row
+Each award year has its own spreadsheet, `<year> Awards Submissions`, in the
+year's Drive folder. Years from before that stay in the master spreadsheet's
+`Sheet1`, and the `Award Years` tab stays in the master. A year's **Sheet ID**
+in that tab says where its entries go; a blank one means the master.
+
+- Adding a year in the admin creates its sheet before saving the year, by
+  calling the `year-sheet` function. It copies the submissions tab of the
+  latest year's sheet, or the master's, so the columns and formatting carry
+  over, then clears the entries and shares the sheet with the portal's account
+  as a Viewer. The portal reads the sheet back to prove it can. If anything
+  fails the year isn't saved, the error shows on the page, and adding it again
+  picks up where it left off.
+- A year with no Sheet ID can't be opened. Delete its row in the tab and add it
+  again.
+- The `year-sheet` function lives in `backend/pdf-processor`, so it deploys
+  from the same zip. Only the frontend's service account can invoke it.
+- Awards IDs restart at 001 in each year's sheet, because the numbering reads
+  that sheet.
+
+In every sheet, the processor writes each new row
 under its headings, wherever those columns are. The client can insert, move,
 hide or add columns, as long as the headings the processor uses keep their
 names (case and surrounding spaces don't matter). If one of those headings is
 missing, the processor adds it at the end rather than dropping the value.
 The duplicate check finds the **Submission ID** column by its heading too.
 
-- **Award Year** (column A) holds each row's year. The processor fills it
-  for new rows; `scripts/add-award-year-column.py` inserted it and filled it
-  for 2026.
-- Each year has a saved filter view, "<year> entries" (Data → Filter views),
-  showing only that year's rows. The admin's Award Years page creates it when
-  a year is added or opened.
+- **Award Year** holds each row's year, and the processor fills it for new
+  rows. In the master, `scripts/add-award-year-column.py` inserted it as column
+  A and filled it for 2026. The master also keeps its saved filter views for
+  those years; new sheets don't need them.
 
 ---
 

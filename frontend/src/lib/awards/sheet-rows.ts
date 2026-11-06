@@ -1,6 +1,6 @@
 /**
- * Every year's entries share one tab (Sheet1); the processors, the Awards ID
- * numbering and these routes all read it. A row's year is the one in its
+ * Each award year has its own spreadsheet, but years before that share the
+ * master's Sheet1, so rows are still narrowed by year. A row's year is the one in its
  * Awards ID (AW-YYYY-NNN), which comes from the year the entry was filed
  * under. The submission timestamp covers a row whose ID was never written.
  */

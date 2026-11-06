@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
-import { filterValuesByYear } from '@/lib/awards/sheet-rows';
+import { readSubmissionValues } from '@/lib/awards/award-years-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,23 +16,11 @@ interface Submission {
   folderLink?: string;
 }
 
-async function getSheetData() {
-  const sheets = await getSheetsClient(true);
-  const spreadsheetId = process.env.AWARDS_SHEET_ID;
-
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: 'Sheet1!A:ZZ',
-  });
-
-  return response.data.values || [];
-}
-
 export async function GET(request: NextRequest) {
   try {
     const year = request.nextUrl.searchParams.get('year');
 
-    const data = filterValuesByYear(await getSheetData(), year);
+    const data = await readSubmissionValues(await getSheetsClient(true), year);
 
     if (data.length < 2) {
       return NextResponse.json([]);

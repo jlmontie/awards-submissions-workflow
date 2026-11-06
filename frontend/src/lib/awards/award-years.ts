@@ -20,6 +20,7 @@ export const AWARD_YEARS_HEADERS = [
   'Closed At',
   'Updated At',
   'Updated By',
+  'Sheet ID',
 ] as const;
 
 // Deadlines are given as dates and mean the end of that day where the
@@ -45,6 +46,8 @@ export interface AwardYear {
   closedAt: string;
   updatedAt: string;
   updatedBy: string;
+  /** The year's own spreadsheet; '' for years whose entries are in the master. */
+  sheetId: string;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -77,13 +80,14 @@ export function parseAwardYears(values: string[][]): AwardYear[] {
         closedAt: cell(4),
         updatedAt: cell(5),
         updatedBy: cell(6),
+        sheetId: cell(7),
       };
     })
     .filter((y) => isValidYear(y.year));
 }
 
 export function toRow(y: AwardYear): string[] {
-  return [y.year, y.status, y.opens, y.closes, y.closedAt, y.updatedAt, y.updatedBy];
+  return [y.year, y.status, y.opens, y.closes, y.closedAt, y.updatedAt, y.updatedBy, y.sheetId];
 }
 
 /** Milliseconds a zone is ahead of UTC at a given instant. */

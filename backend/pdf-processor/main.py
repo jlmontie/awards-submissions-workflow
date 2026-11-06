@@ -14,6 +14,7 @@ from google.cloud import storage, secretmanager
 from google.oauth2 import service_account
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
 import PyPDF2
 import pikepdf
@@ -51,6 +52,9 @@ CHECKBOX_OFF_VALUES = {'', '/Off', 'Off', 'None'}
 
 # The awards sheet's main tab
 SHEET_TAB = 'Sheet1'
+# Lives in the master spreadsheet, whichever sheet a year's entries go to.
+AWARD_YEARS_TAB = 'Award Years'
+SPREADSHEET_MIME_TYPE = 'application/vnd.google-apps.spreadsheet'
 
 # Initialize clients
 storage_client = storage.Client()
@@ -894,6 +898,161 @@ def find_column(headers: List[str], name: str) -> Optional[int]:
     return None
 
 
+def award_year_sheets(service, master_id: str) -> Dict[str, str]:
+    """
+    Each award year's spreadsheet, as listed in the Award Years tab.
+
+    Years with no Sheet ID predate per-year sheets and are left out: their
+    entries are in the master spreadsheet. Errors other than a missing tab are
+    raised, because a guess here would file an entry in the wrong sheet, and
+    the trigger retries a failed run.
+    """
+    try:
+        rows = service.spreadsheets().values().get(
+            spreadsheetId=master_id, range=f"'{AWARD_YEARS_TAB}'!A:Z"
+        ).execute().get('values', [])
+    except HttpError as e:
+        # Sheets answers a range on a tab that doesn't exist with a 400.
+        if e.resp.status == 400:
+            return {}
+        raise
+    if not rows:
+        return {}
+
+    year_column = find_column(rows[0], 'Year')
+    sheet_column = find_column(rows[0], 'Sheet ID')
+    if year_column is None or sheet_column is None:
+        return {}
+
+    sheets = {}
+    for row in rows[1:]:
+        if len(row) > max(year_column, sheet_column) and row[sheet_column].strip():
+            sheets[row[year_column].strip()] = row[sheet_column].strip()
+    return sheets
+
+
+def year_sheet_name(year: str) -> str:
+    return f'{year} Awards Submissions'
+
+
+def find_year_sheet(drive, folder_id: str, name: str) -> Optional[str]:
+    """The ID of the year's spreadsheet in its Drive folder, if it has one."""
+    query = (
+        f"name={drive_query_literal(name)} "
+        f"and mimeType='{SPREADSHEET_MIME_TYPE}' "
+        f"and {drive_query_literal(folder_id)} in parents and trashed=false"
+    )
+    files = drive.files().list(q=query, spaces='drive', fields='files(id)').execute().get('files', [])
+    return files[0]['id'] if files else None
+
+
+def apply_sheet_layout(sheets, sheet_id: str, source_id: str):
+    """
+    Give a new spreadsheet the source's submissions tab, without its entries.
+
+    Copying the tab, not writing headings, keeps the client's column order,
+    widths and formatting from the year before. Everything that touches the
+    copy is one batchUpdate, so a failure can't leave a tab named Sheet1
+    holding the source's entries: a retry starts over and removes what the
+    failed run left behind.
+    """
+    source = sheets.spreadsheets().get(
+        spreadsheetId=source_id, fields='sheets.properties(sheetId,title)'
+    ).execute()
+    source_tab = next(
+        (s['properties']['sheetId'] for s in source['sheets'] if s['properties']['title'] == SHEET_TAB),
+        None,
+    )
+    if source_tab is None:
+        raise ValueError(f'No {SHEET_TAB} tab in {source_id} to copy the layout from')
+
+    copied = sheets.spreadsheets().sheets().copyTo(
+        spreadsheetId=source_id, sheetId=source_tab, body={'destinationSpreadsheetId': sheet_id}
+    ).execute()['sheetId']
+
+    meta = sheets.spreadsheets().get(
+        spreadsheetId=sheet_id, fields='sheets(properties(sheetId),filterViews(filterViewId))'
+    ).execute()
+    requests = [{'updateCells': {
+        'range': {'sheetId': copied, 'startRowIndex': 1},
+        'fields': 'userEnteredValue,note',
+    }}]
+    for tab in meta['sheets']:
+        if tab['properties']['sheetId'] == copied:
+            requests += [{'deleteFilterView': {'filterId': view['filterViewId']}}
+                         for view in tab.get('filterViews', [])]
+        else:
+            requests.append({'deleteSheet': {'sheetId': tab['properties']['sheetId']}})
+    requests.append({'updateSheetProperties': {
+        'properties': {'sheetId': copied, 'title': SHEET_TAB}, 'fields': 'title',
+    }})
+    sheets.spreadsheets().batchUpdate(spreadsheetId=sheet_id, body={'requests': requests}).execute()
+
+
+def ensure_year_sheet(drive, sheets, root_id: str, year: str, source_id: str, share_with: str) -> str:
+    """
+    Make sure the year has its spreadsheet, and return its ID.
+
+    Safe to repeat: a sheet from an earlier try is found by name in the year's
+    Drive folder and finished off, and one already set up keeps its entries.
+    """
+    folder_id = find_or_create_folder(drive, root_id, year)
+    name = year_sheet_name(year)
+    sheet_id = find_year_sheet(drive, folder_id, name)
+    if not sheet_id:
+        sheet_id = drive.files().create(
+            body={'name': name, 'mimeType': SPREADSHEET_MIME_TYPE, 'parents': [folder_id]},
+            fields='id',
+        ).execute()['id']
+        logger.info(f"Created {name}: {sheet_id}")
+
+    if not read_sheet_headers(sheets, sheet_id):
+        apply_sheet_layout(sheets, sheet_id, source_id)
+
+    # The portal reads submissions under its own account.
+    drive.permissions().create(
+        fileId=sheet_id,
+        body={'type': 'user', 'role': 'reader', 'emailAddress': share_with},
+        sendNotificationEmail=False,
+    ).execute()
+    return sheet_id
+
+
+@functions_framework.http
+def create_year_sheet(request):
+    """
+    Called by the admin portal when an award year is added, so that a problem
+    with the sheet shows up there and not on the year's first submission.
+
+    The portal has no Drive storage of its own, and this keeps the Drive token
+    in the backend. Only the portal's service account can invoke it
+    (terraform/functions.tf).
+
+    Body: {"year": "2027", "share_with": <portal account>, "source_sheet_id": <optional>}
+    """
+    body = request.get_json(silent=True) or {}
+    year = str(body.get('year', ''))
+    share_with = str(body.get('share_with', ''))
+    if not re.fullmatch(r'\d{4}', year):
+        return {'error': 'year must be four digits'}, 400
+    if not re.fullmatch(r'[^@\s]+@[\w.-]+\.gserviceaccount\.com', share_with):
+        return {'error': 'share_with must be a service account'}, 400
+
+    try:
+        sheet_id = ensure_year_sheet(
+            get_drive_service(),
+            get_sheets_service(),
+            get_secret(DRIVE_FOLDER_SECRET),
+            year,
+            body.get('source_sheet_id') or get_secret(AWARDS_SHEET_ID_SECRET),
+            share_with,
+        )
+    except Exception as e:
+        logger.error(f"Could not create the {year} sheet: {e}", exc_info=True)
+        return {'error': str(e)}, 500
+    return {'sheet_id': sheet_id}, 200
+
+
 def append_row_by_header(service, sheet_id: str, row: Dict[str, Any]):
     """
     Append a submission's row, placing each value under its heading.
@@ -1016,8 +1175,9 @@ def process_pdf(cloud_event):
         # takes a fresh Awards ID and appends a row. The trigger retries on
         # failure, and a retry of a run that got partway through would
         # double-post, so stop here if the submission already has a row.
-        sheet_id = get_secret(AWARDS_SHEET_ID_SECRET)
         sheets_service = get_sheets_service()
+        master_id = get_secret(AWARDS_SHEET_ID_SECRET)
+        sheet_id = award_year_sheets(sheets_service, master_id).get(year, master_id)
         if submission_already_recorded(sheets_service, sheet_id, submission_id):
             logger.info(f"Submission {submission_id} already in sheet, skipping")
             return {'status': 'skipped', 'reason': 'already_recorded'}

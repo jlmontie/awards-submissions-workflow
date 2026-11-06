@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
+import { readSubmissionValues } from '@/lib/awards/award-years-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-async function getSheetData() {
-  const sheets = await getSheetsClient(true);
-  const spreadsheetId = process.env.AWARDS_SHEET_ID;
-
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: 'Sheet1!A:ZZ',
-  });
-
-  return response.data.values || [];
-}
 
 export async function GET(
   request: NextRequest,
@@ -22,7 +11,9 @@ export async function GET(
 ) {
   try {
     const awardsId = params.id;
-    const data = await getSheetData();
+    // The Awards ID says which year's sheet to look in.
+    const year = awardsId.match(/^AW-(\d{4})-/)?.[1] ?? null;
+    const data = await readSubmissionValues(await getSheetsClient(true), year);
 
     if (data.length < 2) {
       return NextResponse.json({ error: 'No data found' }, { status: 404 });

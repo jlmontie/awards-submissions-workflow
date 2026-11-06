@@ -8,6 +8,7 @@ import {
   createAwardYear,
   readAwardYears,
 } from '@/lib/awards/award-years-store';
+import { createYearSheet } from '@/lib/awards/year-sheet-function';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -35,7 +36,12 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const body = await request.json();
-    const year = await createAwardYear(await getSheetsClient(), body, session?.user?.email || '');
+    const year = await createAwardYear(
+      await getSheetsClient(),
+      body,
+      session?.user?.email || '',
+      createYearSheet
+    );
     return NextResponse.json(year, { status: 201 });
   } catch (error) {
     if (error instanceof AwardYearError) {

@@ -20,6 +20,7 @@ function year(overrides: Partial<AwardYear>): AwardYear {
     closedAt: '',
     updatedAt: '',
     updatedBy: '',
+    sheetId: '',
     ...overrides,
   };
 }
