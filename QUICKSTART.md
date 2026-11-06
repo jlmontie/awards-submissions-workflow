@@ -63,7 +63,7 @@ chmod +x scripts/setup-google-apis.sh
 1. Go to [Google Sheets](https://sheets.google.com)
 2. Create "Awards Submissions Master"
 3. Copy sheet ID from URL (the part after `/spreadsheets/d/`)
-4. Headers are optional — the PDF processor appends rows in a fixed column order and does not read the header row. For a matching header row, use the exact list written by [backend/pdf-processor/main.py:672-733](backend/pdf-processor/main.py#L672-L733) as the source of truth (it ends with the four Phase 1 winner-tracking columns: `Awards ID`, `Status`, `Winner Category`, `Winner Notes`).
+4. Headers are optional — the PDF processor appends rows in a fixed column order and does not read the header row. For a matching header row, use the exact list written by [backend/pdf-processor/main.py:672-733](backend/pdf-processor/main.py#L672-L733) as the source of truth (it includes the winner-tracking columns: `Awards ID`, `Winner Category`, `Winner Notes`).
 
 ### 3. Setup reCAPTCHA (5 min)
 

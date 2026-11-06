@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { filterValuesByYear, rowYear } from './sheet-rows';
+import { filterValuesByYear, isWinner, rowYear } from './sheet-rows';
 
 const HEADERS = ['Submission Timestamp', 'Official Name', 'Awards ID'];
+
+describe('isWinner', () => {
+  it('goes by the Winner Category typed into the sheet', () => {
+    expect(isWinner('K-12')).toBe(true);
+    expect(isWinner('   ')).toBe(false);
+    expect(isWinner('')).toBe(false);
+    expect(isWinner(undefined)).toBe(false);
+  });
+});
 
 describe('rowYear', () => {
   it('reads the Awards ID, then the timestamp', () => {

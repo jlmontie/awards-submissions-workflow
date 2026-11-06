@@ -6,7 +6,6 @@ import Link from 'next/link';
 
 interface Submission {
   awardsId: string;
-  status: string;
   projectName: string;
   firm: string;
   category: string;
@@ -29,7 +28,7 @@ function SubmissionsContent() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState<'category' | 'team' | null>(null);
   const [exportError, setExportError] = useState('');
 
   useEffect(() => {
@@ -77,20 +76,21 @@ function SubmissionsContent() {
     }
   }
 
-  async function handleExport() {
-    setExporting(true);
+  async function download(kind: 'category' | 'team', path: string, fallbackName: string) {
+    setExporting(kind);
     setExportError('');
     try {
-      const res = await fetch(`/api/awards/admin/export?${yearQuery().slice(1)}`);
-      if (!res.ok) throw new Error('Export failed. Please try again.');
+      const res = await fetch(`${path}?${yearQuery().slice(1)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'Export failed. Please try again.');
+      }
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download =
-        res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ||
-        'awards-submissions-by-category.xlsx';
+      a.download = res.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] || fallbackName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -98,7 +98,7 @@ function SubmissionsContent() {
     } catch (err: any) {
       setExportError(err.message);
     } finally {
-      setExporting(false);
+      setExporting(null);
     }
   }
 
@@ -112,23 +112,6 @@ function SubmissionsContent() {
     );
   });
 
-  function getStatusBadge(status: string) {
-    const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      winner: 'bg-green-100 text-green-800',
-      not_selected: 'bg-gray-100 text-gray-800',
-    };
-    return (
-      <span
-        className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-          styles[status as keyof typeof styles] || styles.pending
-        }`}
-      >
-        {status}
-      </span>
-    );
-  }
-
   return (
     <div className="px-4 sm:px-6 lg:px-8">
       <div className="sm:flex sm:items-center">
@@ -141,12 +124,24 @@ function SubmissionsContent() {
         </div>
         <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex sm:flex-none sm:gap-3">
           <button
-            onClick={handleExport}
-            disabled={exporting}
+            onClick={() =>
+              download('category', '/api/awards/admin/export', 'awards-submissions-by-category.xlsx')
+            }
+            disabled={exporting !== null}
             title="One row per project category, as an Excel table"
             className="inline-flex items-center rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
           >
-            {exporting ? 'Exporting…' : 'Export by Category (.xlsx)'}
+            {exporting === 'category' ? 'Exporting…' : 'Export by Category (.xlsx)'}
+          </button>
+          <button
+            onClick={() =>
+              download('team', '/api/awards/admin/project-team-export', 'awards-winners-project-team.xlsx')
+            }
+            disabled={exporting !== null}
+            title="Winners' project teams, for the awards video and yearbook"
+            className="inline-flex items-center rounded-md bg-navy-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-navy-600 disabled:opacity-50"
+          >
+            {exporting === 'team' ? 'Exporting…' : 'Export Winner Project Teams (.xlsx)'}
           </button>
           <Link
             href="/admin/awards/years"
@@ -196,16 +191,6 @@ function SubmissionsContent() {
             }`}
           >
             All ({submissions.length})
-          </button>
-          <button
-            onClick={() => navigate({ filter: 'pending' })}
-            className={`relative -ml-px inline-flex items-center px-3 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 ${
-              filter === 'pending'
-                ? 'bg-navy-500 text-white'
-                : 'bg-white text-gray-900 hover:bg-gray-50'
-            }`}
-          >
-            Pending
           </button>
           <button
             onClick={() => navigate({ filter: 'winners' })}
@@ -258,7 +243,7 @@ function SubmissionsContent() {
                     Category
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Status
+                    Winner
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Actions
@@ -286,8 +271,8 @@ function SubmissionsContent() {
                         {submission.category}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap">
-                      {getStatusBadge(submission.status)}
+                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                      {submission.winnerCategory}
                     </td>
                     <td className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap">
                       <Link

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
-import { filterValuesByYear } from '@/lib/awards/sheet-rows';
+import { filterValuesByYear, isWinner } from '@/lib/awards/sheet-rows';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 interface Submission {
   awardsId: string;
-  status: string;
   projectName: string;
   firm: string;
   category: string;
@@ -46,7 +45,6 @@ export async function GET(request: NextRequest) {
 
     // Find column indices
     const awardsIdIndex = headers.findIndex((h) => h === 'Awards ID');
-    const statusIndex = headers.findIndex((h) => h === 'Status');
     const projectNameIndex = headers.findIndex((h) => h === 'Official Name');
     const firmIndex = headers.findIndex((h) => h === 'Name of Firm');
     const categoryIndex = headers.findIndex((h) => h === 'Project Category or Categories for Consideration');
@@ -59,7 +57,6 @@ export async function GET(request: NextRequest) {
     const submissions: Submission[] = rows
       .map((row) => ({
         awardsId: row[awardsIdIndex] || '',
-        status: row[statusIndex] || 'pending',
         projectName: row[projectNameIndex] || '(Unnamed)',
         firm: row[firmIndex] || '',
         category: row[categoryIndex] || '',
@@ -68,13 +65,7 @@ export async function GET(request: NextRequest) {
         pdfLink: row[pdfLinkIndex] || '',
         folderLink: row[folderLinkIndex] || '',
       }))
-      .filter((s) => {
-        // Filter by status
-        if (filter === 'all') return true;
-        if (filter === 'pending') return s.status === 'pending';
-        if (filter === 'winners') return s.status === 'winner';
-        return true;
-      })
+      .filter((s) => filter !== 'winners' || isWinner(s.winnerCategory))
       .sort((a, b) => {
         // Sort by Awards ID descending (newest first)
         return b.awardsId.localeCompare(a.awardsId);

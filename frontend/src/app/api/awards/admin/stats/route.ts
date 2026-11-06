@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
-import { filterValuesByYear } from '@/lib/awards/sheet-rows';
+import { filterValuesByYear, isWinner } from '@/lib/awards/sheet-rows';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
     if (data.length < 2) {
       return NextResponse.json({
         total: 0,
-        pending: 0,
         winners: 0,
       });
     }
@@ -32,26 +31,12 @@ export async function GET(request: NextRequest) {
     const headers = data[0];
     const rows = data.slice(1);
 
-    // Find Status column index
-    const statusIndex = headers.findIndex((h) => h === 'Status');
+    const winnerCategoryIndex = headers.findIndex((h) => h === 'Winner Category');
 
-    const stats = {
+    return NextResponse.json({
       total: rows.length,
-      pending: 0,
-      winners: 0,
-    };
-
-    if (statusIndex !== -1) {
-      rows.forEach((row) => {
-        const status = row[statusIndex] || 'pending';
-        if (status === 'pending') stats.pending++;
-        if (status === 'winner') stats.winners++;
-      });
-    } else {
-      stats.pending = rows.length;
-    }
-
-    return NextResponse.json(stats);
+      winners: rows.filter((row) => isWinner(row[winnerCategoryIndex])).length,
+    });
   } catch (error: any) {
     console.error('Error fetching stats:', error);
     return NextResponse.json(
