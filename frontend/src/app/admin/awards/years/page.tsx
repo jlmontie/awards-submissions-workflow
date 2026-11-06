@@ -11,6 +11,7 @@ interface AwardYear {
   closedAt: string;
   updatedAt: string;
   updatedBy: string;
+  sheetId: string;
 }
 
 type Window =
@@ -87,7 +88,19 @@ function YearRow({ y, onSaved }: { y: AwardYear; onSaved: () => void }) {
 
   return (
     <tr>
-      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-semibold text-gray-900">{y.year}</td>
+      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-semibold text-gray-900">
+        {y.year}
+        {y.sheetId && (
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${y.sheetId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-xs font-normal text-charcoal-500 hover:text-secondary-400"
+          >
+            Open sheet
+          </a>
+        )}
+      </td>
       <td className="whitespace-nowrap px-3 py-4 text-sm">
         <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${STATUS_STYLES[y.status]}`}>
           {y.status}
@@ -162,8 +175,9 @@ function NewYearForm({ suggested, onCreated }: { suggested: string; onCreated: (
     <form onSubmit={create} className="mt-10 rounded-lg border border-gray-200 bg-white p-6">
       <h2 className="text-lg font-heading font-semibold text-navy-500">Add an award year</h2>
       <p className="mt-1 text-sm text-gray-600">
-        New years start closed and take no entries until you click Open, even if an opening date has passed. After
-        that, the form waits for the opening date if there is one. Only one year can be open at a time.
+        Adding a year creates its own submissions sheet in the year&apos;s Drive folder, with the same columns as the
+        latest year. New years start closed and take no entries until you click Open, even if an opening date has
+        passed. After that, the form waits for the opening date if there is one. Only one year can be open at a time.
       </p>
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-end">
         <label className="text-sm text-gray-700">
@@ -179,7 +193,7 @@ function NewYearForm({ suggested, onCreated }: { suggested: string; onCreated: (
           <input type="date" value={closes} onChange={(e) => setCloses(e.target.value)} className="mt-1 block rounded-md border border-gray-300 px-3 py-2" />
         </label>
         <button type="submit" disabled={saving} className="rounded-md bg-navy-500 px-4 py-2 text-sm font-semibold text-white hover:bg-navy-600 disabled:opacity-50">
-          {saving ? 'Adding…' : 'Add year'}
+          {saving ? 'Creating sheet…' : 'Add year'}
         </button>
       </div>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

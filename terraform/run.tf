@@ -76,6 +76,11 @@ resource "google_cloud_run_v2_service" "frontend" {
       }
 
       env {
+        name  = "YEAR_SHEET_FUNCTION_URL"
+        value = google_cloudfunctions2_function.year_sheet.service_config[0].uri
+      }
+
+      env {
         name = "GOOGLE_SERVICE_ACCOUNT_KEY"
         value_source {
           secret_key_ref {

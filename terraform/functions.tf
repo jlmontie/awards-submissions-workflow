@@ -120,6 +120,60 @@ resource "google_cloud_run_service_iam_member" "pdf_processor_invoker" {
   member   = "serviceAccount:${google_service_account.backend.email}"
 }
 
+# Creates an award year's spreadsheet when the admin portal adds the year.
+# Same source as the PDF processor, so it shares the processor's Drive and
+# Sheets helpers and its Drive token, which stays in the backend.
+resource "google_cloudfunctions2_function" "year_sheet" {
+  name        = "${local.awards_prefix}-year-sheet"
+  location    = var.region
+  description = "Creates an award year's submissions spreadsheet"
+
+  build_config {
+    runtime     = "python311"
+    entry_point = "create_year_sheet"
+
+    source {
+      storage_source {
+        bucket = google_storage_bucket.functions_source.name
+        object = google_storage_bucket_object.pdf_processor_zip.name
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1
+    min_instance_count = 0
+    available_memory   = "512Mi"
+    timeout_seconds    = 120
+    # Cloud Run's outbound traffic comes from outside the network, so
+    # internal-only ingress would refuse the portal. Access is by IAM: only
+    # the invoker grant below.
+    ingress_settings               = "ALLOW_ALL"
+    service_account_email          = google_service_account.backend.email
+    all_traffic_on_latest_revision = true
+
+    environment_variables = {
+      GCP_PROJECT_ID          = var.project_id
+      DRIVE_FOLDER_SECRET     = google_secret_manager_secret.drive_folder.secret_id
+      AWARDS_SHEET_ID_SECRET  = google_secret_manager_secret.awards_sheet_id.secret_id
+      USER_OAUTH_TOKEN_SECRET = google_secret_manager_secret.user_oauth_token.secret_id
+    }
+  }
+
+  labels = local.common_labels
+
+  depends_on = [
+    google_project_service.required_apis
+  ]
+}
+
+resource "google_cloud_run_service_iam_member" "year_sheet_invoker" {
+  location = google_cloudfunctions2_function.year_sheet.location
+  service  = google_cloudfunctions2_function.year_sheet.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.frontend.email}"
+}
+
 # Cloud Function for photo processing
 resource "google_cloudfunctions2_function" "photo_processor" {
   name        = "${local.awards_prefix}-photo-processor"

@@ -140,7 +140,7 @@ function SubmissionsContent() {
         <div className="sm:flex-auto">
           <h1 className="text-2xl font-heading font-semibold text-navy-500">Submissions</h1>
           <p className="mt-2 text-sm text-gray-700">
-            {year && year !== 'all' ? `${year} awards submissions` : 'All awards submissions'} for
+            {year && year !== 'all' ? `${year} awards submissions` : 'Awards submissions in the shared sheet'} for
             review and management
           </p>
         </div>
@@ -225,7 +225,7 @@ function SubmissionsContent() {
               {y}
             </option>
           ))}
-          <option value="all">All years</option>
+          <option value="all">Shared sheet (older years)</option>
         </select>
         <div className="flex rounded-md shadow-sm">
           <button

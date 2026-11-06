@@ -1,4 +1,5 @@
 import type { SheetsClient } from '@/lib/google-sheets';
+import { filterValuesByYear } from './sheet-rows';
 import {
   AWARD_YEAR_STATUSES,
   AWARD_YEARS_HEADERS,
@@ -15,8 +16,8 @@ import {
   toRow,
 } from './award-years';
 
-const RANGE = `'${AWARD_YEARS_TAB}'!A:G`;
-// Where the processor writes submissions.
+const RANGE = `'${AWARD_YEARS_TAB}'!A:H`;
+// Where the processor writes submissions, in the master and in each year's sheet.
 const SUBMISSIONS_TAB = 'Sheet1';
 
 export interface AwardYearsSnapshot {
@@ -56,6 +57,20 @@ export async function readAwardYears(
     if (isMissingTab(err)) return { configured: false, years: [] };
     throw err;
   }
+}
+
+/**
+ * The submissions rows for a year, heading row first: from the year's own
+ * sheet, or from the master for years that predate those. With no year, the
+ * whole of the master.
+ */
+export async function readSubmissionValues(sheets: SheetsClient, year: string | null): Promise<string[][]> {
+  const own = year ? (await readAwardYears(sheets)).years.find((y) => y.year === year)?.sheetId : '';
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: own || sheetId(),
+    range: `${SUBMISSIONS_TAB}!A:ZZ`,
+  });
+  return filterValuesByYear((res.data.values as string[][]) || [], year);
 }
 
 // ── The public form's view, cached ───────────────────────────────────────
@@ -148,59 +163,48 @@ async function ensureTab(sheets: SheetsClient) {
   const spreadsheetId = sheetId();
   const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets.properties.title' });
   const exists = meta.data.sheets?.some((s) => s.properties?.title === AWARD_YEARS_TAB);
-  if (exists) return;
+  if (exists) {
+    // A tab from before per-year sheets has no heading for their IDs.
+    const heading = await sheets.spreadsheets.values.get({ spreadsheetId, range: `'${AWARD_YEARS_TAB}'!H1` });
+    if (heading.data.values?.[0]?.[0]) return;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${AWARD_YEARS_TAB}'!H1`,
+      valueInputOption: 'RAW',
+      requestBody: { values: [[AWARD_YEARS_HEADERS[7]]] },
+    });
+    return;
+  }
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
     requestBody: { requests: [{ addSheet: { properties: { title: AWARD_YEARS_TAB } } }] },
   });
   await sheets.spreadsheets.values.update({
     spreadsheetId,
-    range: `'${AWARD_YEARS_TAB}'!A1:G1`,
+    range: `'${AWARD_YEARS_TAB}'!A1:H1`,
     valueInputOption: 'RAW',
     requestBody: { values: [[...AWARD_YEARS_HEADERS]] },
   });
 }
 
+/** Creates, or finds, a year's spreadsheet from the source's layout and returns its ID. */
+export type CreateYearSheet = (year: string, sourceSheetId: string | undefined) => Promise<string>;
+
 /**
- * A saved filter view on the submissions tab showing one year's rows, so the
- * client can switch between years in the sheet itself without changing its
- * columns or anyone else's view. Filters on the Award Year column, or on the
- * Awards ID prefix where that column doesn't exist. Created once per year;
- * an existing view of the same title is left as the client may have edited it.
- *
- * Best-effort: a failure here is logged and never fails saving the year.
+ * Prove the portal can read a new sheet, so that a sharing problem stops the
+ * year being added instead of surfacing once entries are expected in it.
  */
-export async function ensureYearFilterView(sheets: SheetsClient, year: string): Promise<void> {
-  const spreadsheetId = sheetId();
-  const title = `${year} entries`;
+async function confirmReadable(sheets: SheetsClient, spreadsheetId: string, year: string) {
+  let headers: unknown[] = [];
   try {
-    const meta = await sheets.spreadsheets.get({
-      spreadsheetId,
-      fields: 'sheets(properties(sheetId,title),filterViews(title))',
-    });
-    const tab = meta.data.sheets?.find((s) => s.properties?.title === SUBMISSIONS_TAB);
-    if (!tab || tab.filterViews?.some((v) => v.title === title)) return;
-
-    const headerRes = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBMISSIONS_TAB}!1:1` });
-    const headers = ((headerRes.data.values?.[0] as string[]) || []).map((h) => String(h).trim().toLowerCase());
-    const yearCol = headers.indexOf('award year');
-    const idCol = headers.indexOf('awards id');
-    const spec =
-      yearCol >= 0
-        ? { columnIndex: yearCol, filterCriteria: { condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: year }] } } }
-        : idCol >= 0
-          ? { columnIndex: idCol, filterCriteria: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: `AW-${year}-` }] } } }
-          : null;
-    if (!spec) return;
-
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [{ addFilterView: { filter: { title, range: { sheetId: tab.properties!.sheetId }, filterSpecs: [spec] } } }],
-      },
-    });
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: `${SUBMISSIONS_TAB}!1:1` });
+    headers = res.data.values?.[0] ?? [];
   } catch (err) {
-    console.error(`Could not create the "${title}" filter view:`, err);
+    console.error(`Could not read the ${year} sheet:`, err);
+    throw new AwardYearError(`The ${year} sheet was created, but the portal can't read it. Try adding the year again.`, 502);
+  }
+  if (headers.length === 0) {
+    throw new AwardYearError(`The ${year} sheet has no column headings. Try adding the year again.`, 502);
   }
 }
 
@@ -208,6 +212,7 @@ export async function createAwardYear(
   sheets: SheetsClient,
   input: AwardYearInput,
   by: string,
+  createSheet: CreateYearSheet,
   now = new Date()
 ): Promise<AwardYear> {
   await ensureTab(sheets);
@@ -225,8 +230,15 @@ export async function createAwardYear(
     closedAt: '',
     updatedAt: now.toISOString(),
     updatedBy: by,
+    sheetId: '',
   };
   validate(next, years);
+
+  // The sheet comes first, so a year is only saved once it has somewhere to
+  // file entries. A failed try can be repeated: the function finds its sheet.
+  const latest = [...years].sort((a, b) => b.year.localeCompare(a.year)).find((y) => y.sheetId);
+  next.sheetId = await createSheet(year, latest?.sheetId);
+  await confirmReadable(sheets, next.sheetId, year);
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: sheetId(),
@@ -236,7 +248,6 @@ export async function createAwardYear(
     requestBody: { values: [toRow(next)] },
   });
   invalidateAwardYearsCache();
-  await ensureYearFilterView(sheets, year);
   return next;
 }
 
@@ -254,6 +265,12 @@ export async function updateAwardYear(
   if (!current) throw new AwardYearError(`${year} not found.`, 404);
 
   const status = patch.status ?? current.status;
+  if (status === 'open' && current.status !== 'open' && !current.sheetId) {
+    throw new AwardYearError(
+      `${year} has no submissions sheet. Delete its row in the Award Years tab, then add the year again here.`,
+      409
+    );
+  }
   const next: AwardYear = {
     ...current,
     status,
@@ -271,11 +288,10 @@ export async function updateAwardYear(
   const rowNumber = values.findIndex((row, i) => i > 0 && String(row[0] ?? '').trim() === year) + 1;
   await sheets.spreadsheets.values.update({
     spreadsheetId: sheetId(),
-    range: `'${AWARD_YEARS_TAB}'!A${rowNumber}:G${rowNumber}`,
+    range: `'${AWARD_YEARS_TAB}'!A${rowNumber}:H${rowNumber}`,
     valueInputOption: 'RAW',
     requestBody: { values: [toRow(next)] },
   });
   invalidateAwardYearsCache();
-  if (status === 'open') await ensureYearFilterView(sheets, year);
   return next;
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSheetsClient } from '@/lib/google-sheets';
 import { buildProjectTeamWorkbook, buildWinnerProjects } from '@/lib/awards/project-team-export';
-import { filterValuesByYear } from '@/lib/awards/sheet-rows';
+import { readSubmissionValues } from '@/lib/awards/award-years-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -11,15 +11,9 @@ export const runtime = 'nodejs';
 export async function GET(request: NextRequest) {
   try {
     const year = request.nextUrl.searchParams.get('year');
-    const sheets = await getSheetsClient(true);
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.AWARDS_SHEET_ID,
-      range: 'Sheet1!A:ZZ',
-    });
+    const values = await readSubmissionValues(await getSheetsClient(true), year);
 
-    const projects = buildWinnerProjects(
-      filterValuesByYear((response.data.values as string[][]) || [], year)
-    );
+    const projects = buildWinnerProjects(values);
     if (projects.length === 0) {
       const scope = year ? ` for ${year}` : '';
       return NextResponse.json(
