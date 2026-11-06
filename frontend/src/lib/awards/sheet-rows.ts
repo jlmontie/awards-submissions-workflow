@@ -16,6 +16,11 @@ export function rowYear(headers: string[], row: string[]): string {
   );
 }
 
+/** The client records a win by typing the category into the sheet's Winner Category column. */
+export function isWinner(winnerCategory: string | undefined): boolean {
+  return Boolean(winnerCategory?.trim());
+}
+
 /** Sheet values (header row first) narrowed to one year; all rows when `year` is empty. */
 export function filterValuesByYear(values: string[][], year: string | null): string[][] {
   if (!year || values.length === 0) return values;

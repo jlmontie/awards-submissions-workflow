@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { isWinner } from '@/lib/awards/sheet-rows';
 
 interface Submission {
   [key: string]: string;
@@ -15,9 +16,6 @@ export default function SubmissionDetailPage() {
 
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
-  const [marking, setMarking] = useState(false);
-  const [category, setCategory] = useState('');
-  const [notes, setNotes] = useState('');
 
   useEffect(() => {
     loadSubmission();
@@ -29,30 +27,11 @@ export default function SubmissionDetailPage() {
       if (!res.ok) throw new Error('Failed to load');
       const data = await res.json();
       setSubmission(data);
-      setCategory(data['Winner Category'] || '');
-      setNotes(data['Winner Notes'] || '');
     } catch (error) {
       console.error('Error loading submission:', error);
     } finally {
       setLoading(false);
     }
-  }
-
-  function getStatusBadge(status: string) {
-    const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      winner: 'bg-green-100 text-green-800',
-      not_selected: 'bg-gray-100 text-gray-800',
-    };
-    return (
-      <span
-        className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-          styles[status as keyof typeof styles] || styles.pending
-        }`}
-      >
-        {status}
-      </span>
-    );
   }
 
   if (loading) {
@@ -86,24 +65,35 @@ export default function SubmissionDetailPage() {
         >
           &larr; Back to submissions
         </Link>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-heading font-semibold text-navy-500">
-              {submission['Official Name'] || 'Unnamed Project'}
-            </h1>
-            <p className="mt-1 text-sm text-gray-500">
-              {submission['Awards ID']} &bull; Submitted {submission['Submission Timestamp']}
-            </p>
-          </div>
-          <div>
-            {getStatusBadge(submission.Status || 'pending')}
-          </div>
-        </div>
+        <h1 className="text-2xl font-heading font-semibold text-navy-500">
+          {submission['Official Name'] || 'Unnamed Project'}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          {submission['Awards ID']} &bull; Submitted {submission['Submission Timestamp']}
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content - 2 columns */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-4xl space-y-6">
+        {/* Winner Info */}
+        {isWinner(submission['Winner Category']) && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-green-900 mb-2">Winner</h3>
+            <dl className="text-sm space-y-1">
+              <div>
+                <dt className="text-green-700">Category:</dt>
+                <dd className="text-green-900 font-medium">{submission['Winner Category']}</dd>
+              </div>
+              {submission['Winner Notes'] && (
+                <div>
+                  <dt className="text-green-700">Notes:</dt>
+                  <dd className="text-green-900">{submission['Winner Notes']}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+        )}
+
+        <div className="space-y-6">
           {/* Quick Links */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Quick Actions</h2>
@@ -225,79 +215,6 @@ export default function SubmissionDetailPage() {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Sidebar - 1 column */}
-        <div className="space-y-6">
-          {/* Mark as Winner */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-heading font-medium text-navy-500 mb-4">Winner Status</h2>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Award Category
-                </label>
-                <input
-                  type="text"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  placeholder="e.g., Best Concrete Project"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm px-3 py-2 border"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Notes
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Judge comments or notes..."
-                  rows={3}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm px-3 py-2 border"
-                />
-              </div>
-
-              <button
-                onClick={() => {/* TODO: Implement */}}
-                disabled={marking || !category}
-                className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-black bg-primary-500 hover:bg-black hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {marking ? 'Updating...' : 'Mark as Winner'}
-              </button>
-
-              {submission.Status === 'winner' && (
-                <button
-                  onClick={() => {/* TODO: Implement */}}
-                  disabled={marking}
-                  className="w-full inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-                >
-                  Remove Winner Status
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Current Winner Info */}
-          {submission.Status === 'winner' && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-green-900 mb-2">Current Winner</h3>
-              <dl className="text-sm space-y-1">
-                <div>
-                  <dt className="text-green-700">Category:</dt>
-                  <dd className="text-green-900 font-medium">{submission['Winner Category']}</dd>
-                </div>
-                {submission['Winner Notes'] && (
-                  <div>
-                    <dt className="text-green-700">Notes:</dt>
-                    <dd className="text-green-900">{submission['Winner Notes']}</dd>
-                  </div>
-                )}
-              </dl>
-            </div>
-          )}
         </div>
       </div>
     </div>

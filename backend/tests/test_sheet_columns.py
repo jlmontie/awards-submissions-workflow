@@ -81,7 +81,7 @@ def column_index(letters):
 
 
 ROW = {'Submission Timestamp': 't', 'Submission ID': 'sub-1', 'PDF Link': 'link', 'Official Name': 'Nusano',
-       'Awards ID': 'AW-2027-001', 'Status': 'pending', 'Winner Category': '', 'Winner Notes': '',
+       'Awards ID': 'AW-2027-001', 'Winner Category': '', 'Winner Notes': '',
        'Submitter Email': 's@x.co', 'Invoice Email': 'ap@x.co', 'Award Year': '2027'}
 
 
@@ -91,10 +91,10 @@ def test_column_letters(index, letters):
 
 
 def test_values_land_under_their_headings_after_the_client_rearranges():
-    # Award Year inserted as column A, Status moved before Official Name, and
+    # Award Year inserted as column A, Awards ID moved before Official Name, and
     # a column of the client's own that the processor knows nothing about.
-    sheet = FakeSheet(['Award Year', 'Submission Timestamp', 'Submission ID', 'PDF Link', 'Status',
-                       'Official Name', 'Judge Notes', 'Awards ID', 'Winner Category', 'Winner Notes',
+    sheet = FakeSheet(['Award Year', 'Submission Timestamp', 'Submission ID', 'PDF Link', 'Awards ID',
+                       'Official Name', 'Judge Notes', 'Winner Category', 'Winner Notes',
                        'Submitter Email', 'Invoice Email'])
     pdf_processor.append_row_by_header(sheet, 'sheet-1', ROW)
     assert sheet.last_row() == {**ROW, 'Judge Notes': ''}
@@ -108,7 +108,8 @@ def test_headings_the_sheet_lacks_are_added_at_the_end():
     pdf_processor.append_row_by_header(sheet, 'sheet-1', ROW)
     assert sheet.grid[0] == LIVE_2026 + ['Submitter Email', 'Invoice Email', 'Award Year']
     assert sheet.calls == ['widen'] and sheet.columns == 11
-    assert sheet.last_row() == ROW
+    # Status is a retired heading: left in place if the sheet still has it, unfilled.
+    assert sheet.last_row() == {**ROW, 'Status': ''}
     # Existing rows are untouched.
     assert sheet.grid[1] == ['t0', 'sub-0', 'l', 'Old', 'AW-2026-001', 'pending', '', '']
 

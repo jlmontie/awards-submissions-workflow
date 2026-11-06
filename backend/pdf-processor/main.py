@@ -1119,7 +1119,6 @@ def process_pdf(cloud_event):
             "Contribution to the Industry and Community":       fields.get('Contribution to the Industry and Community', ''),
             "Overcoming Unique Challenges/Obstacles":           fields.get('Overcoming Unique Challenges/Obstacles', ''),
             "Awards ID":                                        awards_id,
-            "Status":                                           'pending',
             "Winner Category":                                  '',
             "Winner Notes":                                     '',
             "Submitter Email":                                  contact['submitter'],

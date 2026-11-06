@@ -133,6 +133,10 @@ export async function buildCategoryWorkbook(data: CategoryExport): Promise<Array
     }
   });
 
+  return workbookToArrayBuffer(workbook);
+}
+
+export async function workbookToArrayBuffer(workbook: ExcelJS.Workbook): Promise<ArrayBuffer> {
   const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
   return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }

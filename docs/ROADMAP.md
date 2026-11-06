@@ -13,7 +13,7 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 | **Awards Submissions** | ✅ Working in production |
 | **Awards ID & Confirmation Email** | ✅ Working (IDs minted server-side, confirmation email sent via SMTP) |
 | **Admin Portal — read-only views** | ✅ Deployed (list, detail) |
-| **Admin Portal — winner marking** | ⏸️ On hold pending client decision on whether the portal owns winner management |
+| **Winner management** | ✅ In the sheet: the client enters each winner's category in the Winner Category column (the portal only reads it) |
 | **Admin Portal — authentication** | ⏸️ On hold pending client decision on auth method (portal is currently unauthenticated) |
 | **Survey Module** | ✅ Deployed and in active use (creation, distribution, response tracking, export) |
 
@@ -27,7 +27,7 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────┐  │
 │  │ PUBLIC SIDE     │  │ ADMIN SIDE       │  │ BACKGROUND   │  │
 │  │ • Awards Form   │  │ • Submissions    │  │ • PDF Parser │  │
-│  │ • Survey Form   │  │ • Mark Winners   │  │ • Email Send │  │
+│  │ • Survey Form   │  │ • Team Exports   │  │ • Email Send │  │
 │  │ • Status Check  │  │ • Survey Mgmt    │  │ • File Org   │  │
 │  └─────────────────┘  └──────────────────┘  └──────────────┘  │
 └────────────────────────────────────────────────────────────────┘
@@ -42,7 +42,7 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 - Unique submission IDs (AW-YYYY-NNN) minted server-side
 - Winner tracking columns in the master Google Sheet
 - Confirmation email templates
-- Admin CLI tools for winner management (`scripts/mark-winner.py`, `scripts/export-winners-teams.py`)
+- Winners recorded in the sheet's Winner Category column; the portal exports their project teams
 - Project team extraction and export
 
 ### Phase 2: Admin Portal — Read-only deployed; write flows on hold
@@ -52,7 +52,6 @@ The UC+D platform expands beyond awards to a unified web system for awards submi
 - Submission detail view
 - **On hold:**
   - Authentication — awaiting client decision on auth method
-  - Winner marking through the portal — awaiting client decision on whether the portal (vs. CLI) should own winner management. Detail-view Mark/Unmark buttons are present but not wired to a write endpoint.
 
 ### Phase 3: Survey Module — ✅ Deployed
 
@@ -87,7 +86,7 @@ Admin Creates Survey → Upload Recipients → System Sends Unique Links
 
 ## Data & Schema
 
-**Awards Sheet columns (Phase 1):** Awards ID, Status (pending/winner/not_selected), Winner_Category, Winner_Notes, plus existing submission fields.
+**Awards Sheet columns (Phase 1):** Awards ID, Winner Category (filled in means the entry won), Winner Notes, plus existing submission fields.
 
 **Survey export format:** Tab-delimited; firms sorted by revenue; DND/out-of-state in separate files. See `docs/surveys/Survey_Sorting_Rules.md` for column specs.
 
